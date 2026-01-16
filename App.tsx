@@ -9,7 +9,8 @@ import {
   X,
   Cloud,
   CloudOff,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 import { Store } from './store';
 import Dashboard from './pages/Dashboard';
@@ -18,6 +19,7 @@ import LogEntry from './pages/LogEntry';
 import ReportPreview from './pages/ReportPreview';
 import SettingsPage from './pages/Settings';
 import HistoryPage from './pages/History';
+import Login from './pages/Login';
 
 const NavItem = ({ to, icon: Icon, label, onClick }: { to: string, icon: any, label: string, onClick?: () => void }) => {
   const location = useLocation();
@@ -43,14 +45,13 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCloudEnabled, setIsCloudEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(Store.isAuthenticated());
 
   useEffect(() => {
     const checkCloud = () => {
       setIsCloudEnabled(Store.isCloudEnabled());
     };
     checkCloud();
-    
-    // Periodically check or listen for settings changes
     const interval = setInterval(checkCloud, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -60,6 +61,20 @@ const App: React.FC = () => {
     await Store.syncLocalToCloud();
     setTimeout(() => setIsSyncing(false), 1000);
   };
+
+  const handleLogin = () => {
+    Store.login();
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    Store.logout();
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   return (
     <Router>
@@ -90,14 +105,23 @@ const App: React.FC = () => {
                 <p className="text-xs text-amber-800 font-medium">Logged in as</p>
                 <p className="text-sm font-bold text-slate-800">Admin Staff</p>
               </div>
-              {isCloudEnabled && (
+              <div className="flex gap-1">
+                {isCloudEnabled && (
+                  <button 
+                    onClick={handleManualSync}
+                    className={`p-2 hover:bg-amber-100 rounded-full transition-all ${isSyncing ? 'animate-spin text-amber-600' : 'text-amber-400'}`}
+                  >
+                    <RefreshCw size={14}/>
+                  </button>
+                )}
                 <button 
-                  onClick={handleManualSync}
-                  className={`p-2 hover:bg-amber-100 rounded-full transition-all ${isSyncing ? 'animate-spin text-amber-600' : 'text-amber-400'}`}
+                  onClick={handleLogout}
+                  className="p-2 hover:bg-red-50 text-red-400 hover:text-red-600 rounded-full transition-all"
+                  title="Logout"
                 >
-                  <RefreshCw size={14}/>
+                  <LogOut size={14}/>
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </aside>
@@ -126,6 +150,13 @@ const App: React.FC = () => {
               <NavItem to="/children" icon={Baby} label="Children" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/history" icon={History} label="History" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/settings" icon={SettingsIcon} label="Settings" onClick={() => setIsMenuOpen(false)} />
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all mt-4"
+              >
+                <LogOut size={20} />
+                <span>Logout</span>
+              </button>
             </nav>
           </div>
         )}

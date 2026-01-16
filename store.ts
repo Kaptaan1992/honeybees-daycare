@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Child, Parent, DailyLog, Settings, EmailSendLog } from './types';
 
@@ -8,6 +7,7 @@ const STORAGE_KEYS = {
   DAILY_LOGS: 'hb_daily_logs',
   SETTINGS: 'hb_settings',
   SEND_LOGS: 'hb_send_logs',
+  AUTH_TOKEN: 'hb_auth_token'
 };
 
 const INITIAL_CHILDREN: Child[] = [
@@ -61,11 +61,9 @@ export class Store {
     return !!this.getClient();
   }
 
-  // Helper to sync local data to cloud on startup if cloud just became enabled
   static async syncLocalToCloud() {
     const client = this.getClient();
     if (!client) return;
-    // Basic implementation: if cloud is empty, upload local
     const { count } = await client.from('children').select('*', { count: 'exact', head: true });
     if (count === 0) {
       await client.from('children').insert(this.getChildrenLocal());
@@ -74,7 +72,20 @@ export class Store {
     }
   }
 
-  // --- Settings (Keep local first for bootstrap) ---
+  // --- Auth ---
+  static isAuthenticated(): boolean {
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) === 'true';
+  }
+
+  static login() {
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, 'true');
+  }
+
+  static logout() {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+  }
+
+  // --- Settings ---
   static getSettings(): Settings {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     return data ? JSON.parse(data) : INITIAL_SETTINGS;
@@ -82,7 +93,7 @@ export class Store {
 
   static saveSettings(settings: Settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    this.client = null; // Reset client to force re-init with new creds
+    this.client = null;
   }
 
   // --- Children ---
