@@ -64,9 +64,17 @@ export interface DiaperPottyEntry {
 
 export interface ActivityEntry {
   id: string;
-  time: string;
+  time?: string;
   category: 'Circle Time' | 'Outdoor' | 'Art' | 'Sensory' | 'Story' | 'Free Play' | 'Other' | 'Tummy Time' | 'Outdoors Play' | 'Singing' | 'Storytime';
   description: string;
+  notes?: string;
+}
+
+export interface MedicationEntry {
+  id: string;
+  time: string;
+  name: string;
+  dosage: string;
   notes?: string;
 }
 
@@ -93,6 +101,7 @@ export interface DailyLog {
   naps: NapEntry[];
   diapers: DiaperPottyEntry[];
   activities: ActivityEntry[];
+  medications: MedicationEntry[];
   incidents: IncidentEntry[];
   status: 'In Progress' | 'Completed' | 'Sent';
 }
@@ -102,6 +111,7 @@ export interface Settings {
   fromEmail: string;
   emailSignature: string;
   testEmail: string;
+  adminPassword?: string; // Stored password
   autoSendTime?: string;
   // EmailJS Integration
   emailjsServiceId?: string;

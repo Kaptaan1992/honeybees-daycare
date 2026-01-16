@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LogIn, Lock, User, AlertCircle } from 'lucide-react';
+import { Store } from '../store';
 
 interface LoginProps {
   onLogin: () => void;
@@ -12,8 +13,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Default admin credentials as requested
-    if (username === 'admin' && password === 'honeybees2025') {
+    const settings = Store.getSettings();
+    const storedPassword = settings.adminPassword || 'honeybees2025';
+
+    if (username === 'admin' && password === storedPassword) {
       onLogin();
     } else {
       setError('Invalid username or password. Please try again.');

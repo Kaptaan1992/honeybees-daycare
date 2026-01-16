@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Child, Parent, DailyLog, Settings, EmailSendLog } from './types';
 
@@ -39,6 +40,7 @@ const INITIAL_SETTINGS: Settings = {
   fromEmail: 'reports@honeybeesdaycare.com',
   emailSignature: 'With love,\nHoneybees Daycare Team',
   testEmail: '',
+  adminPassword: 'honeybees2025', // Default password
   emailjsServiceId: '',
   emailjsTemplateId: '',
   emailjsPublicKey: '',
@@ -88,7 +90,11 @@ export class Store {
   // --- Settings ---
   static getSettings(): Settings {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return data ? JSON.parse(data) : INITIAL_SETTINGS;
+    const settings = data ? JSON.parse(data) : INITIAL_SETTINGS;
+    if (!settings.adminPassword) {
+      settings.adminPassword = INITIAL_SETTINGS.adminPassword;
+    }
+    return settings;
   }
 
   static saveSettings(settings: Settings) {
@@ -174,10 +180,24 @@ export class Store {
     }
   }
 
+  static async deleteDailyLog(id: string) {
+    const logs = await this.getDailyLogs();
+    const filtered = logs.filter(l => l.id !== id);
+    await this.saveDailyLogs(filtered);
+    
+    const client = this.getClient();
+    if (client) {
+      await client.from('daily_logs').delete().eq('id', id);
+    }
+  }
+
   static async getOrCreateDailyLog(childId: string, date: string): Promise<DailyLog> {
     const logs = await this.getDailyLogs();
     const existing = logs.find(l => l.childId === childId && l.date === date);
-    if (existing) return existing;
+    if (existing) return {
+      ...existing,
+      medications: existing.medications || []
+    };
 
     const newLog: DailyLog = {
       id: Math.random().toString(36).substr(2, 9),
@@ -193,6 +213,7 @@ export class Store {
       naps: [],
       diapers: [],
       activities: [],
+      medications: [],
       incidents: [],
       status: 'In Progress'
     };

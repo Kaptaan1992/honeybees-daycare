@@ -3,7 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store } from '../store';
 import { DailyLog, Child, EmailSendLog } from '../types';
-import { Calendar, Eye, Send, Filter, CheckCircle, Loader2 } from 'lucide-react';
+import { Calendar, Eye, Send, Filter, CheckCircle, Loader2, Trash2 } from 'lucide-react';
+
+const format12h = (timeStr: string) => {
+  if (!timeStr) return '';
+  const [hours, minutes] = timeStr.split(':');
+  let h = parseInt(hours);
+  const m = minutes || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  h = h ? h : 12;
+  return `${h}:${m} ${ampm}`;
+};
 
 const HistoryPage: React.FC = () => {
   const [logs, setLogs] = useState<DailyLog[]>([]);
@@ -13,16 +24,24 @@ const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      const allLogs = await Store.getDailyLogs();
-      setLogs(allLogs.sort((a, b) => b.date.localeCompare(a.date)));
-      setChildren(await Store.getChildren());
-      setSendLogs(await Store.getSendLogs());
-      setIsLoading(false);
-    };
     loadData();
   }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    const allLogs = await Store.getDailyLogs();
+    setLogs(allLogs.sort((a, b) => b.date.localeCompare(a.date)));
+    setChildren(await Store.getChildren());
+    setSendLogs(await Store.getSendLogs());
+    setIsLoading(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this daily report? This action cannot be undone.')) {
+      await Store.deleteDailyLog(id);
+      await loadData();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -101,6 +120,13 @@ const HistoryPage: React.FC = () => {
                             title="Edit Log"
                           >
                             <Send size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(log.id)}
+                            className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                            title="Delete Report"
+                          >
+                            <Trash2 size={18} />
                           </button>
                         </div>
                       </td>

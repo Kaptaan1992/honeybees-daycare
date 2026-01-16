@@ -9,21 +9,18 @@ export const generateDailySummary = async (log: DailyLog, child: Child, parent: 
   if (!process.env.API_KEY) return log.teacherNotes;
 
   const prompt = `
-    Generate a warm, professional, and friendly daycare daily summary for a parent.
+    Generate a warm, professional, and very CONCISE daycare daily summary (max 60 words).
     Child Name: ${child.firstName}
-    Date: ${log.date}
     Mood: ${log.overallMood}
-    Meals: ${log.meals.map(m => `${m.type}: ${m.items} (${m.amount} eaten)`).join(', ')}
-    Naps: ${log.naps.map(n => `From ${n.startTime} to ${n.endTime} (Quality: ${n.quality})`).join(', ')}
-    Activities: ${log.activities.map(a => `${a.category}: ${a.description}`).join(', ')}
+    Activities: ${log.activities.map(a => a.category).join(', ')}
     Raw Teacher Notes: ${log.teacherNotes}
     Preferred Language: ${parent.preferredLanguage}
 
     Instructions:
-    - If language is Urdu or Punjabi, provide the translation of the narrative.
-    - Focus on the positive highlights of the day.
-    - Use a supportive and caring tone.
-    - Format as a cohesive paragraph or two.
+    - Keep it very brief and focused on the best highlight of the day.
+    - Focus on a narrative summary, not a list of facts.
+    - If language is Urdu or Punjabi, provide the translation only.
+    - Format as a single, punchy paragraph.
   `;
 
   try {
@@ -31,7 +28,6 @@ export const generateDailySummary = async (log: DailyLog, child: Child, parent: 
       model: "gemini-3-flash-preview",
       contents: prompt,
     });
-    // Use .text property to extract output
     return response.text || log.teacherNotes;
   } catch (error) {
     console.error("Gemini Summarization Error:", error);

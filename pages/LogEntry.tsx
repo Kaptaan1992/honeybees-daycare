@@ -10,6 +10,7 @@ import {
   NapEntry, 
   DiaperPottyEntry, 
   ActivityEntry,
+  MedicationEntry,
   Mood,
   MealAmount,
   NapQuality,
@@ -26,8 +27,20 @@ import {
   Trash2,
   Clock,
   Sparkles,
-  Loader2
+  Loader2,
+  Pill
 } from 'lucide-react';
+
+const format12h = (timeStr: string) => {
+  if (!timeStr) return '--:--';
+  const [hours, minutes] = timeStr.split(':');
+  let h = parseInt(hours);
+  const m = minutes || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  h = h ? h : 12;
+  return `${h}:${m} ${ampm}`;
+};
 
 const LogEntry: React.FC = () => {
   const { childId } = useParams<{ childId: string }>();
@@ -67,10 +80,12 @@ const LogEntry: React.FC = () => {
     await Store.saveDailyLogs(allLogs);
   };
 
+  const getCurrentTime24 = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
   const addMeal = () => {
     const meal: MealEntry = {
       id: Math.random().toString(36).substr(2, 9),
-      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      time: getCurrentTime24(),
       type: 'Snack',
       items: '',
       amount: 'All'
@@ -81,7 +96,7 @@ const LogEntry: React.FC = () => {
   const addBottle = () => {
     const bottle: BottleEntry = {
       id: Math.random().toString(36).substr(2, 9),
-      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      time: getCurrentTime24(),
       type: 'Milk',
       amount: '6oz'
     };
@@ -91,7 +106,7 @@ const LogEntry: React.FC = () => {
   const addNap = () => {
     const nap: NapEntry = {
       id: Math.random().toString(36).substr(2, 9),
-      startTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      startTime: getCurrentTime24(),
       endTime: '',
       quality: 'Great'
     };
@@ -101,7 +116,7 @@ const LogEntry: React.FC = () => {
   const addDiaper = () => {
     const diaper: DiaperPottyEntry = {
       id: Math.random().toString(36).substr(2, 9),
-      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      time: getCurrentTime24(),
       type: 'Wet'
     };
     updateLog({ diapers: [...log!.diapers, diaper] });
@@ -110,11 +125,20 @@ const LogEntry: React.FC = () => {
   const addActivity = () => {
     const activity: ActivityEntry = {
       id: Math.random().toString(36).substr(2, 9),
-      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       category: 'Free Play',
       description: ''
     };
     updateLog({ activities: [...log!.activities, activity] });
+  };
+
+  const addMedication = () => {
+    const med: MedicationEntry = {
+      id: Math.random().toString(36).substr(2, 9),
+      time: getCurrentTime24(),
+      name: '',
+      dosage: ''
+    };
+    updateLog({ medications: [...(log!.medications || []), med] });
   };
 
   const removeEntry = (type: keyof DailyLog, id: string) => {
@@ -172,24 +196,24 @@ const LogEntry: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Arrival</label>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Check In ({format12h(log.arrivalTime)})</label>
             <div className="relative">
               <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
               <input 
                 type="time" 
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-amber-400"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-amber-400 text-sm"
                 value={log.arrivalTime}
                 onChange={(e) => updateLog({ arrivalTime: e.target.value })}
               />
             </div>
           </div>
           <div>
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Departure</label>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Check Out ({format12h(log.departureTime)})</label>
             <div className="relative">
               <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
               <input 
                 type="time" 
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-amber-400"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-amber-400 text-sm"
                 value={log.departureTime}
                 onChange={(e) => updateLog({ departureTime: e.target.value })}
               />
@@ -199,16 +223,22 @@ const LogEntry: React.FC = () => {
       </section>
 
       {/* Quick Add Grid */}
-      <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
         <ActionButton icon={Utensils} label="Meal" color="amber" onClick={addMeal} />
         <ActionButton icon={Baby} label="Bottle" color="blue" onClick={addBottle} />
         <ActionButton icon={Moon} label="Nap" color="purple" onClick={addNap} />
         <ActionButton icon={Wind} label="Diaper" color="emerald" onClick={addDiaper} />
         <ActionButton icon={Palette} label="Activity" color="rose" onClick={addActivity} />
+        <ActionButton icon={Pill} label="Meds" color="indigo" onClick={addMedication} />
       </div>
 
       {/* Entries List */}
       <div className="space-y-4">
+        <MedicationList 
+          items={log.medications || []} 
+          onUpdate={(id, updates) => updateEntry('medications', id, updates)} 
+          onRemove={(id) => removeEntry('medications', id)} 
+        />
         <ActivityList 
           items={log.activities} 
           onUpdate={(id, updates) => updateEntry('activities', id, updates)} 
@@ -280,20 +310,64 @@ const ActionButton = ({ icon: Icon, label, color, onClick }: { icon: any, label:
     purple: 'bg-purple-100 text-purple-700',
     emerald: 'bg-emerald-100 text-emerald-700',
     rose: 'bg-rose-100 text-rose-700',
+    indigo: 'bg-indigo-100 text-indigo-700',
   };
 
   return (
     <button 
       onClick={onClick}
-      className={`flex flex-col items-center justify-center p-3 rounded-2xl border border-transparent shadow-sm hover:shadow-md transition-all active:scale-95 ${colors[color]}`}
+      className={`flex flex-col items-center justify-center p-2 rounded-2xl border border-transparent shadow-sm hover:shadow-md transition-all active:scale-95 ${colors[color]}`}
     >
-      <div className="mb-1"><Icon size={20} /></div>
+      <div className="mb-1"><Icon size={18} /></div>
       <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
     </button>
   );
 };
 
-// ... Specialized Editable Lists (Rest of file same as before) ...
+const MedicationList = ({ items, onUpdate, onRemove }: { items: MedicationEntry[], onUpdate: (id: string, updates: any) => void, onRemove: (id: string) => void }) => {
+  if (items.length === 0) return null;
+  return (
+    <div className="bg-white rounded-3xl border border-indigo-50 p-6 shadow-sm border-l-4 border-l-indigo-400">
+      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <Pill size={18} className="text-indigo-500" />
+        Medication
+      </h3>
+      <div className="space-y-4">
+        {items.map(item => (
+          <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-indigo-50/30 p-3 rounded-2xl">
+            <div className="col-span-3">
+              <div className="text-[8px] font-bold text-indigo-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
+              <input 
+                type="time" 
+                className="w-full bg-white border-none rounded-lg p-1 text-xs font-bold text-indigo-600"
+                value={item.time}
+                onChange={(e) => onUpdate(item.id, { time: e.target.value })}
+              />
+            </div>
+            <input 
+              type="text" 
+              placeholder="Name"
+              className="col-span-4 bg-white border-none rounded-lg p-1.5 text-xs font-bold text-slate-700"
+              value={item.name}
+              onChange={(e) => onUpdate(item.id, { name: e.target.value })}
+            />
+            <input 
+              type="text" 
+              placeholder="Dosage"
+              className="col-span-4 bg-white border-none rounded-lg p-1.5 text-xs"
+              value={item.dosage}
+              onChange={(e) => onUpdate(item.id, { dosage: e.target.value })}
+            />
+            <button onClick={() => onRemove(item.id)} className="col-span-1 p-1.5 text-indigo-300 hover:text-indigo-500">
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const ActivityList = ({ items, onUpdate, onRemove }: { items: ActivityEntry[], onUpdate: (id: string, updates: any) => void, onRemove: (id: string) => void }) => {
   if (items.length === 0) return null;
   const categories = ['Tummy Time', 'Outdoors Play', 'Singing', 'Storytime', 'Art', 'Circle Time', 'Sensory', 'Free Play', 'Other'];
@@ -308,12 +382,6 @@ const ActivityList = ({ items, onUpdate, onRemove }: { items: ActivityEntry[], o
         {items.map(item => (
           <div key={item.id} className="bg-rose-50/30 p-3 rounded-2xl space-y-3">
             <div className="flex items-center gap-2">
-              <input 
-                type="time" 
-                className="bg-white border-none rounded-lg p-1.5 text-xs font-bold text-rose-600"
-                value={item.time}
-                onChange={(e) => onUpdate(item.id, { time: e.target.value })}
-              />
               <select 
                 className="flex-1 bg-white border-none rounded-lg p-1.5 text-xs font-bold text-slate-700"
                 value={item.category}
@@ -349,12 +417,15 @@ const MealList = ({ items, onUpdate, onRemove }: { items: MealEntry[], onUpdate:
       <div className="space-y-4">
         {items.map(item => (
           <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-3 rounded-2xl relative group">
-            <input 
-              type="time" 
-              className="col-span-3 bg-white border-none rounded-lg p-1.5 text-xs font-bold text-amber-600"
-              value={item.time}
-              onChange={(e) => onUpdate(item.id, { time: e.target.value })}
-            />
+            <div className="col-span-3">
+              <div className="text-[8px] font-bold text-amber-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
+              <input 
+                type="time" 
+                className="w-full bg-white border-none rounded-lg p-1 text-xs font-bold text-amber-600"
+                value={item.time}
+                onChange={(e) => onUpdate(item.id, { time: e.target.value })}
+              />
+            </div>
             <select 
               className="col-span-4 bg-white border-none rounded-lg p-1.5 text-xs font-medium"
               value={item.type}
@@ -406,12 +477,15 @@ const BottleList = ({ items, onUpdate, onRemove }: { items: BottleEntry[], onUpd
       <div className="space-y-3">
         {items.map(item => (
           <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-blue-50/50 p-3 rounded-2xl">
-            <input 
-              type="time" 
-              className="col-span-3 bg-white border-none rounded-lg p-1.5 text-xs font-bold text-blue-600"
-              value={item.time}
-              onChange={(e) => onUpdate(item.id, { time: e.target.value })}
-            />
+            <div className="col-span-3">
+              <div className="text-[8px] font-bold text-blue-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
+              <input 
+                type="time" 
+                className="w-full bg-white border-none rounded-lg p-1 text-xs font-bold text-blue-600"
+                value={item.time}
+                onChange={(e) => onUpdate(item.id, { time: e.target.value })}
+              />
+            </div>
             <select 
               className="col-span-4 bg-white border-none rounded-lg p-1.5 text-xs font-medium"
               value={item.type}
@@ -449,23 +523,27 @@ const NapList = ({ items, onUpdate, onRemove }: { items: NapEntry[], onUpdate: (
         {items.map(item => (
           <div key={item.id} className="bg-purple-50/50 p-3 rounded-2xl space-y-2">
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-white p-1 rounded-lg">
-                <span className="text-[10px] font-bold text-slate-400 px-1">Start</span>
-                <input 
-                  type="time" 
-                  className="bg-transparent border-none p-1 text-xs font-bold text-purple-600 w-20"
-                  value={item.startTime}
-                  onChange={(e) => onUpdate(item.id, { startTime: e.target.value })}
-                />
+              <div className="flex-1 flex flex-col gap-1">
+                <div className="text-[8px] font-bold text-purple-400 uppercase ml-1">Start: {format12h(item.startTime)}</div>
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg">
+                  <input 
+                    type="time" 
+                    className="bg-transparent border-none p-1 text-xs font-bold text-purple-600 w-full"
+                    value={item.startTime}
+                    onChange={(e) => onUpdate(item.id, { startTime: e.target.value })}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-1 bg-white p-1 rounded-lg">
-                <span className="text-[10px] font-bold text-slate-400 px-1">Stop</span>
-                <input 
-                  type="time" 
-                  className="bg-transparent border-none p-1 text-xs font-bold text-purple-600 w-20"
-                  value={item.endTime}
-                  onChange={(e) => onUpdate(item.id, { endTime: e.target.value })}
-                />
+              <div className="flex-1 flex flex-col gap-1">
+                <div className="text-[8px] font-bold text-purple-400 uppercase ml-1">End: {format12h(item.endTime)}</div>
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg">
+                  <input 
+                    type="time" 
+                    className="bg-transparent border-none p-1 text-xs font-bold text-purple-600 w-full"
+                    value={item.endTime}
+                    onChange={(e) => onUpdate(item.id, { endTime: e.target.value })}
+                  />
+                </div>
               </div>
               <button onClick={() => onRemove(item.id)} className="ml-auto p-1.5 text-red-300 hover:text-red-500">
                 <Trash2 size={16} />
@@ -502,12 +580,15 @@ const DiaperList = ({ items, onUpdate, onRemove }: { items: DiaperPottyEntry[], 
       <div className="space-y-3">
         {items.map(item => (
           <div key={item.id} className="flex items-center gap-3 bg-emerald-50/50 p-3 rounded-2xl">
-            <input 
-              type="time" 
-              className="bg-white border-none rounded-lg p-1.5 text-xs font-bold text-emerald-600"
-              value={item.time}
-              onChange={(e) => onUpdate(item.id, { time: e.target.value })}
-            />
+            <div className="flex flex-col gap-0.5">
+              <div className="text-[8px] font-bold text-emerald-400 uppercase ml-1">{format12h(item.time)}</div>
+              <input 
+                type="time" 
+                className="bg-white border-none rounded-lg p-1 text-xs font-bold text-emerald-600"
+                value={item.time}
+                onChange={(e) => onUpdate(item.id, { time: e.target.value })}
+              />
+            </div>
             <div className="flex gap-1 flex-1">
               {(['Wet', 'BM', 'Both', 'Potty'] as DiaperType[]).map(t => (
                 <button 
