@@ -18,6 +18,7 @@ export interface Child {
   emergencyNotes?: string;
   active: boolean;
   parentIds: string[];
+  dailyMedications?: string[];
 }
 
 export interface Parent {

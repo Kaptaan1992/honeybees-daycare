@@ -30,7 +30,8 @@ CREATE TABLE children (
   "napNotes" TEXT,
   "emergencyNotes" TEXT,
   active BOOLEAN DEFAULT true,
-  "parentIds" JSONB DEFAULT '[]'
+  "parentIds" JSONB DEFAULT '[]',
+  "dailyMedications" JSONB DEFAULT '[]'
 );
 
 CREATE TABLE parents (
@@ -57,6 +58,7 @@ CREATE TABLE daily_logs (
   naps JSONB DEFAULT '[]',
   diapers JSONB DEFAULT '[]',
   activities JSONB DEFAULT '[]',
+  medications JSONB DEFAULT '[]',
   incidents JSONB DEFAULT '[]',
   status TEXT
 );
@@ -70,6 +72,10 @@ CREATE TABLE send_logs (
   status TEXT
 );
 ```
+
+### 🛠 Migration for existing users
+If you already created your tables, just run this single line to add the new medication field:
+`ALTER TABLE children ADD COLUMN "dailyMedications" JSONB DEFAULT '[]';`
 
 3.  **Config**: In the Honeybees **Settings** page, enter your Supabase URL and Anon Key. Your data will now sync automatically!
 

@@ -28,7 +28,9 @@ import {
   Clock,
   Sparkles,
   Loader2,
-  Pill
+  Pill,
+  ChevronDown,
+  X
 } from 'lucide-react';
 
 const format12h = (timeStr: string) => {
@@ -236,6 +238,7 @@ const LogEntry: React.FC = () => {
       <div className="space-y-4">
         <MedicationList 
           items={log.medications || []} 
+          childMeds={child.dailyMedications || []}
           onUpdate={(id, updates) => updateEntry('medications', id, updates)} 
           onRemove={(id) => removeEntry('medications', id)} 
         />
@@ -324,8 +327,96 @@ const ActionButton = ({ icon: Icon, label, color, onClick }: { icon: any, label:
   );
 };
 
-const MedicationList = ({ items, onUpdate, onRemove }: { items: MedicationEntry[], onUpdate: (id: string, updates: any) => void, onRemove: (id: string) => void }) => {
+// Fix: Properly type MedicationItem as a React.FC to handle 'key' prop in maps correctly.
+const MedicationItem: React.FC<{ 
+  item: MedicationEntry, 
+  childMeds: string[], 
+  onUpdate: (id: string, updates: any) => void, 
+  onRemove: (id: string) => void 
+}> = ({ item, childMeds, onUpdate, onRemove }) => {
+  const isStandard = childMeds.includes(item.name) || item.name === "";
+  const [isManualInput, setIsManualInput] = useState(!isStandard && item.name !== "");
+
+  return (
+    <div className="bg-indigo-50/30 p-4 rounded-2xl space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-24">
+          <div className="text-[8px] font-bold text-indigo-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
+          <input 
+            type="time" 
+            className="w-full bg-white border-none rounded-lg p-1.5 text-xs font-bold text-indigo-600"
+            value={item.time}
+            onChange={(e) => onUpdate(item.id, { time: e.target.value })}
+          />
+        </div>
+        
+        <div className="flex-1 space-y-2">
+          <div className="text-[8px] font-bold text-indigo-400 uppercase ml-1">Medication Name</div>
+          {!isManualInput && childMeds.length > 0 ? (
+            <div className="relative">
+              <select 
+                className="w-full bg-white border-none rounded-lg p-2 text-xs font-bold text-slate-700 pr-8 appearance-none"
+                value={item.name}
+                onChange={(e) => {
+                  if (e.target.value === "OTHER_MANUAL") {
+                    setIsManualInput(true);
+                    onUpdate(item.id, { name: "" });
+                  } else {
+                    onUpdate(item.id, { name: e.target.value });
+                  }
+                }}
+              >
+                <option value="">Select Medication...</option>
+                {childMeds.map(med => <option key={med} value={med}>{med}</option>)}
+                <option value="OTHER_MANUAL">+ Add Other...</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                autoFocus={isManualInput}
+                placeholder="Type medication name..."
+                className="flex-1 bg-white border-none rounded-lg p-2 text-xs font-bold text-slate-700"
+                value={item.name}
+                onChange={(e) => onUpdate(item.id, { name: e.target.value })}
+              />
+              {childMeds.length > 0 && (
+                <button 
+                  onClick={() => { setIsManualInput(false); onUpdate(item.id, { name: "" }); }}
+                  className="p-2 text-indigo-400 hover:text-indigo-600"
+                  title="Back to List"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button onClick={() => onRemove(item.id)} className="p-2 text-indigo-300 hover:text-red-500 transition-colors self-end pb-4">
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      <div className="space-y-1">
+        <div className="text-[8px] font-bold text-indigo-400 uppercase ml-1">Dosage</div>
+        <input 
+          type="text" 
+          placeholder="e.g. 5ml, 1 tablet"
+          className="w-full bg-white border-none rounded-lg p-2 text-xs"
+          value={item.dosage}
+          onChange={(e) => onUpdate(item.id, { dosage: e.target.value })}
+        />
+      </div>
+    </div>
+  );
+};
+
+const MedicationList = ({ items, childMeds, onUpdate, onRemove }: { items: MedicationEntry[], childMeds: string[], onUpdate: (id: string, updates: any) => void, onRemove: (id: string) => void }) => {
   if (items.length === 0) return null;
+
   return (
     <div className="bg-white rounded-3xl border border-indigo-50 p-6 shadow-sm border-l-4 border-l-indigo-400">
       <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -334,34 +425,13 @@ const MedicationList = ({ items, onUpdate, onRemove }: { items: MedicationEntry[
       </h3>
       <div className="space-y-4">
         {items.map(item => (
-          <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-indigo-50/30 p-3 rounded-2xl">
-            <div className="col-span-3">
-              <div className="text-[8px] font-bold text-indigo-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
-              <input 
-                type="time" 
-                className="w-full bg-white border-none rounded-lg p-1 text-xs font-bold text-indigo-600"
-                value={item.time}
-                onChange={(e) => onUpdate(item.id, { time: e.target.value })}
-              />
-            </div>
-            <input 
-              type="text" 
-              placeholder="Name"
-              className="col-span-4 bg-white border-none rounded-lg p-1.5 text-xs font-bold text-slate-700"
-              value={item.name}
-              onChange={(e) => onUpdate(item.id, { name: e.target.value })}
-            />
-            <input 
-              type="text" 
-              placeholder="Dosage"
-              className="col-span-4 bg-white border-none rounded-lg p-1.5 text-xs"
-              value={item.dosage}
-              onChange={(e) => onUpdate(item.id, { dosage: e.target.value })}
-            />
-            <button onClick={() => onRemove(item.id)} className="col-span-1 p-1.5 text-indigo-300 hover:text-indigo-500">
-              <Trash2 size={16} />
-            </button>
-          </div>
+          <MedicationItem 
+            key={item.id} 
+            item={item} 
+            childMeds={childMeds} 
+            onUpdate={onUpdate} 
+            onRemove={onRemove} 
+          />
         ))}
       </div>
     </div>

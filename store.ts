@@ -128,6 +128,17 @@ export class Store {
     }
   }
 
+  static async deleteChild(id: string) {
+    const children = await this.getChildren();
+    const filtered = children.filter(c => c.id !== id);
+    await this.saveChildren(filtered);
+    
+    const client = this.getClient();
+    if (client) {
+      await client.from('children').delete().eq('id', id);
+    }
+  }
+
   // --- Parents ---
   private static getParentsLocal(): Parent[] {
     const data = localStorage.getItem(STORAGE_KEYS.PARENTS);

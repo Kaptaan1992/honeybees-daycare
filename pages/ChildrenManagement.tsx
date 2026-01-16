@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Store } from '../store';
 import { Child, Parent, Language } from '../types';
-import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Languages, Edit3, X, Loader2 } from 'lucide-react';
+import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Languages, Edit3, X, Loader2, Pill } from 'lucide-react';
 
 const ChildrenManagement: React.FC = () => {
   const [children, setChildren] = useState<Child[]>([]);
@@ -19,20 +19,24 @@ const ChildrenManagement: React.FC = () => {
   });
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setChildren(await Store.getChildren());
-      setParents(await Store.getParents());
-      setIsLoading(false);
-    };
     loadData();
   }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    setChildren(await Store.getChildren());
+    setParents(await Store.getParents());
+    setIsLoading(false);
+  };
 
   const saveChild = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const id = editingChild?.id || Math.random().toString(36).substr(2, 9);
     
+    const medsRaw = formData.get('dailyMedications') as string;
+    const dailyMedications = medsRaw ? medsRaw.split(',').map(m => m.trim()).filter(m => m.length > 0) : [];
+
     const newChild: Child = {
       id,
       firstName: formData.get('firstName') as string,
@@ -42,6 +46,7 @@ const ChildrenManagement: React.FC = () => {
       active: true,
       parentIds: editingChild?.parentIds || [],
       allergies: formData.get('allergies') as string,
+      dailyMedications,
     };
 
     const updated = editingChild 
@@ -52,6 +57,13 @@ const ChildrenManagement: React.FC = () => {
     await Store.saveChildren(updated);
     setIsAddingChild(false);
     setEditingChild(null);
+  };
+
+  const handleDeleteChild = async (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to delete ${name}? This will remove them from the system, but their past reports will remain in History.`)) {
+      await Store.deleteChild(id);
+      await loadData();
+    }
   };
 
   const handleParentSave = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -123,13 +135,33 @@ const ChildrenManagement: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => setEditingChild(child)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors">
+                  <button 
+                    onClick={() => setEditingChild(child)} 
+                    className="p-2 text-slate-300 hover:text-amber-500 transition-colors"
+                    title="Edit Child"
+                  >
                     <Edit2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteChild(child.id, child.firstName)} 
+                    className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                    title="Delete Child"
+                  >
+                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>
 
               <div className="flex-1 space-y-3">
+                {child.dailyMedications && child.dailyMedications.length > 0 && (
+                  <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100">
+                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Pill size={12} /> Daily Meds
+                    </p>
+                    <p className="text-xs text-indigo-700 font-medium">{child.dailyMedications.join(', ')}</p>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-400 uppercase">Parents / Guardians</p>
                   <button 
@@ -181,7 +213,7 @@ const ChildrenManagement: React.FC = () => {
       {/* Child Form Modal */}
       {(isAddingChild || editingChild) && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <form onSubmit={saveChild} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4">
+          <form onSubmit={saveChild} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-slate-800 mb-4">{editingChild ? 'Edit' : 'Add New'} Child</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -193,17 +225,28 @@ const ChildrenManagement: React.FC = () => {
                 <input name="lastName" defaultValue={editingChild?.lastName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
               </div>
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Date of Birth</label>
-              <input name="dob" type="date" defaultValue={editingChild?.dob} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Date of Birth</label>
+                <input name="dob" type="date" defaultValue={editingChild?.dob} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Classroom/Group</label>
+                <input name="classroom" defaultValue={editingChild?.classroom} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Classroom/Group</label>
-              <input name="classroom" defaultValue={editingChild?.classroom} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Daily Medications (Optional)</label>
+              <textarea 
+                name="dailyMedications" 
+                placeholder="Tylenol, Advil, Allergy drops (comma separated)"
+                defaultValue={editingChild?.dailyMedications?.join(', ')} 
+                className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 h-20 text-sm" 
+              />
             </div>
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Allergies</label>
-              <textarea name="allergies" defaultValue={editingChild?.allergies} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+              <textarea name="allergies" defaultValue={editingChild?.allergies} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 h-20 text-sm" />
             </div>
             <div className="flex gap-4 pt-4">
               <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3 rounded-2xl shadow-lg shadow-amber-100">Save Child</button>
@@ -235,7 +278,7 @@ const ChildrenManagement: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Relationship</label>
-                <select name="relationship" defaultValue={parentModal.editingParent?.relationship || 'Mom'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400">
+                <select name="relationship" defaultValue={parentModal.editingParent?.relationship || 'Mom'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-sm">
                   <option value="Mom">Mom</option>
                   <option value="Dad">Dad</option>
                   <option value="Guardian">Guardian</option>
@@ -243,7 +286,7 @@ const ChildrenManagement: React.FC = () => {
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Language</label>
-                <select name="preferredLanguage" defaultValue={parentModal.editingParent?.preferredLanguage || 'English'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400">
+                <select name="preferredLanguage" defaultValue={parentModal.editingParent?.preferredLanguage || 'English'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-sm">
                   <option value="English">English</option>
                   <option value="Urdu">Urdu</option>
                   <option value="Punjabi">Punjabi</option>

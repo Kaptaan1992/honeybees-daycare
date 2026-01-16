@@ -38,6 +38,8 @@ const ReportPreview: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isSentSuccessfully, setIsSentSuccessfully] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // UI State
   const [editingParentId, setEditingParentId] = useState<string | null>(null);
@@ -46,21 +48,36 @@ const ReportPreview: React.FC = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!childId || !date) return;
+      if (!childId || !date) {
+        setError("Missing child or date information.");
+        setIsLoading(false);
+        return;
+      }
       
-      const children = await Store.getChildren();
-      const foundChild = children.find(c => c.id === childId);
-      
-      const logs = await Store.getDailyLogs();
-      const foundLog = logs.find(l => l.childId === childId && l.date === date);
-      
-      const allParents = await Store.getParents();
-      
-      if (foundChild && foundLog) {
+      try {
+        setIsLoading(true);
+        const children = await Store.getChildren();
+        const foundChild = children.find(c => c.id === childId);
+        
+        if (!foundChild) {
+          setError("Child record not found.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Use getOrCreate so the preview doesn't hang if a log was recently deleted
+        const foundLog = await Store.getOrCreateDailyLog(childId, date);
+        const allParents = await Store.getParents();
+        
         setChild(foundChild);
         setLog(foundLog);
         setParents(allParents.filter(p => foundChild.parentIds.includes(p.id)));
         setAiSummary(foundLog.teacherNotes || "A wonderful day of learning and play!");
+      } catch (err) {
+        console.error(err);
+        setError("An error occurred while loading the report.");
+      } finally {
+        setIsLoading(false);
       }
     };
     loadData();
@@ -181,10 +198,24 @@ const ReportPreview: React.FC = () => {
     await Store.saveDailyLogs(updatedLogs);
   };
 
-  if (!child || !log) return (
+  if (isLoading) return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-amber-900/40">
        <Loader2 className="animate-spin mb-4" size={32} />
        <p className="font-bold uppercase tracking-widest text-[10px]">Preparing Preview...</p>
+    </div>
+  );
+
+  if (error || !child || !log) return (
+    <div className="p-12 text-center space-y-4">
+      <AlertCircle size={48} className="mx-auto text-amber-600 mb-4" />
+      <h2 className="text-2xl font-brand font-extrabold text-slate-800">Report Not Found</h2>
+      <p className="text-slate-500 max-w-md mx-auto">{error || "The report you are looking for doesn't exist or was recently deleted."}</p>
+      <button 
+        onClick={() => navigate('/')}
+        className="mt-6 bg-amber-600 text-white font-bold px-8 py-3 rounded-2xl shadow-lg hover:bg-amber-700 transition-all"
+      >
+        Back to Dashboard
+      </button>
     </div>
   );
 
