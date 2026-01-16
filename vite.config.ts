@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // This allows the app to use the API key from environment variables
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
+    // Safely handle missing API keys during build
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || ""),
   },
   server: {
     port: 3000,
@@ -13,6 +13,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         main: './index.html',
