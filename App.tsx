@@ -12,13 +12,13 @@ import {
   CloudOff,
   RefreshCw
 } from 'lucide-react';
-import { Store } from './store';
-import Dashboard from './pages/Dashboard';
-import ChildrenManagement from './pages/ChildrenManagement';
-import LogEntry from './pages/LogEntry';
-import ReportPreview from './pages/ReportPreview';
-import SettingsPage from './pages/Settings';
-import HistoryPage from './pages/History';
+import { Store } from './store.ts';
+import Dashboard from './pages/Dashboard.tsx';
+import ChildrenManagement from './pages/ChildrenManagement.tsx';
+import LogEntry from './pages/LogEntry.tsx';
+import ReportPreview from './pages/ReportPreview.tsx';
+import SettingsPage from './pages/Settings.tsx';
+import HistoryPage from './pages/History.tsx';
 
 const NavItem = ({ to, icon: Icon, label, onClick }: { to: string, icon: any, label: string, onClick?: () => void }) => {
   const location = useLocation();
