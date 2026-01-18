@@ -35,6 +35,7 @@ const INITIAL_PARENTS: Parent[] = [
   }
 ];
 
+// --- EMBEDDED SUPABASE CREDENTIALS ---
 const INITIAL_SETTINGS: Settings = {
   daycareName: 'Honeybees Daycare',
   fromEmail: 'reports@honeybeesdaycare.com',
@@ -45,6 +46,8 @@ const INITIAL_SETTINGS: Settings = {
   emailjsTemplateId: '',
   emailjsPublicKey: '',
   sendCopyToSelfDefault: false,
+  supabaseUrl: 'https://dtojckxnfkdltdlwdkel.supabase.co', 
+  supabaseAnonKey: 'sb_publishable_-eS0b-JcPzC3luYDiraSWQ_RTe8Mx0P'
 };
 
 export class Store {
@@ -53,7 +56,8 @@ export class Store {
   static getClient(): SupabaseClient | null {
     if (this.client) return this.client;
     const settings = this.getSettings();
-    if (settings.supabaseUrl && settings.supabaseAnonKey) {
+    // Only init if keys are the actual ones and not placeholders
+    if (settings.supabaseUrl && settings.supabaseAnonKey && settings.supabaseUrl.includes('supabase.co')) {
       try {
         this.client = createClient(settings.supabaseUrl, settings.supabaseAnonKey);
         return this.client;
@@ -102,7 +106,14 @@ export class Store {
   // --- Settings ---
   static getSettings(): Settings {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    const settings = data ? JSON.parse(data) : INITIAL_SETTINGS;
+    const settings = data ? JSON.parse(data) : { ...INITIAL_SETTINGS };
+    
+    // Always fallback to embedded keys if local storage doesn't have valid ones
+    if (!settings.supabaseUrl || !settings.supabaseUrl.includes('supabase.co')) {
+      settings.supabaseUrl = INITIAL_SETTINGS.supabaseUrl;
+      settings.supabaseAnonKey = INITIAL_SETTINGS.supabaseAnonKey;
+    }
+    
     if (!settings.adminPassword) {
       settings.adminPassword = INITIAL_SETTINGS.adminPassword;
     }
@@ -249,6 +260,24 @@ export class Store {
     return this.getDailyLogsLocal();
   }
 
+  static async saveDailyLog(log: DailyLog) {
+    const logs = this.getDailyLogsLocal();
+    const index = logs.findIndex(l => l.id === log.id);
+    if (index !== -1) logs[index] = log;
+    else logs.push(log);
+    
+    localStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(logs));
+    
+    const client = this.getClient();
+    if (client) {
+      try {
+        await client.from('daily_logs').upsert(log);
+      } catch (e) {
+        console.error("Cloud individual log sync failed:", e);
+      }
+    }
+  }
+
   static async saveDailyLogs(logs: DailyLog[]) {
     localStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(logs));
     const client = this.getClient();
@@ -258,13 +287,17 @@ export class Store {
   }
 
   static async deleteDailyLog(id: string) {
-    const logs = await this.getDailyLogs();
+    const logs = this.getDailyLogsLocal();
     const filtered = logs.filter(l => l.id !== id);
-    await this.saveDailyLogs(filtered);
+    localStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(filtered));
     
     const client = this.getClient();
     if (client) {
-      await client.from('daily_logs').delete().eq('id', id);
+      try {
+        await client.from('daily_logs').delete().eq('id', id);
+      } catch (e) {
+        console.error("Cloud deletion failed:", e);
+      }
     }
   }
 

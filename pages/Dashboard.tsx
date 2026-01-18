@@ -69,7 +69,7 @@ const Dashboard: React.FC = () => {
       arrivalTime: nowTime,
       status: 'In Progress'
     };
-    saveLog(childId, updatedLog);
+    await saveLog(childId, updatedLog);
   };
 
   const handleCheckOut = async (childId: string) => {
@@ -81,29 +81,55 @@ const Dashboard: React.FC = () => {
       departureTime: nowTime,
       status: 'Completed' 
     };
-    saveLog(childId, updatedLog);
+    await saveLog(childId, updatedLog);
   };
 
+  /**
+   * ROBUST UNDO ALL:
+   * Overwrites the current log with a blank one where isPresent is false.
+   * This clears all sub-arrays and data points for the day.
+   */
   const handleResetStatus = async (childId: string) => {
-    if (!window.confirm("Undo check-in? This will remove the report from history.")) return;
     const currentLog = logs[childId];
     if (!currentLog) return;
-    const updatedLog: DailyLog = { 
-      ...currentLog, 
+
+    const child = children.find(c => c.id === childId);
+    if (!window.confirm(`Wipe all data for ${child?.firstName} for today? This child will be marked absent.`)) return;
+    
+    // Create a perfectly blank version of the current log
+    const blankLog: DailyLog = { 
+      id: currentLog.id, 
+      childId: childId,
+      date: currentDate,
       isPresent: false, 
       status: 'In Progress',
-      departureTime: '17:30' // Reset to default
+      arrivalTime: '08:00',
+      departureTime: '17:30',
+      overallMood: 'Great',
+      teacherNotes: '',
+      activityNotes: '',
+      suppliesNeeded: '',
+      meals: [],
+      bottles: [],
+      naps: [],
+      diapers: [],
+      activities: [],
+      medications: [],
+      incidents: []
     };
-    saveLog(childId, updatedLog);
+    
+    // Update state immediately for instant feedback
+    setLogs(prev => ({ ...prev, [childId]: blankLog }));
+    
+    // Persist the blank overwrite to local and cloud
+    await Store.saveDailyLog(blankLog);
   };
 
   const saveLog = async (childId: string, updatedLog: DailyLog) => {
+    // UI feedback first
     setLogs(prev => ({ ...prev, [childId]: updatedLog }));
-    const allLogs = await Store.getDailyLogs();
-    const index = allLogs.findIndex(l => l.id === updatedLog.id);
-    if (index !== -1) allLogs[index] = updatedLog;
-    else allLogs.push(updatedLog);
-    await Store.saveDailyLogs(allLogs);
+    // Then save
+    await Store.saveDailyLog(updatedLog);
   };
 
   const filteredChildren = children.filter(c => 
@@ -120,7 +146,6 @@ const Dashboard: React.FC = () => {
       groups[room].push(child);
     });
 
-    // Return entries sorted by room order
     return Object.entries(groups).sort(([a], [b]) => {
       const idxA = order.indexOf(a);
       const idxB = order.indexOf(b);
@@ -235,7 +260,6 @@ const Dashboard: React.FC = () => {
                           </div>
                           {isPresent && (
                             <div className="space-y-2 mt-2">
-                              {/* Allergy Alert - High Visibility when checked in */}
                               {child.allergies && (
                                 <div className="bg-red-50 border border-red-100 px-2.5 py-1 rounded-xl flex items-center gap-2 animate-in slide-in-from-left duration-300">
                                   <AlertCircle size={12} className="text-red-500 shrink-0" />
@@ -276,7 +300,7 @@ const Dashboard: React.FC = () => {
                                 </button>
                               ) : (
                                 <button 
-                                  onClick={() => handleCheckIn(child.id)} // Re-check in if accidental
+                                  onClick={() => handleCheckIn(child.id)} 
                                   className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-blue-200 text-blue-600 font-bold py-2.5 px-6 rounded-xl hover:bg-blue-50 transition-all"
                                 >
                                   <span>Undo Out</span>
@@ -285,7 +309,7 @@ const Dashboard: React.FC = () => {
                               <button 
                                 onClick={() => handleResetStatus(child.id)}
                                 className="p-2.5 text-slate-300 hover:text-red-500 transition-colors"
-                                title="Undo All (Remove from History)"
+                                title="Undo All (Total Wipe)"
                               >
                                 <UserX size={18} />
                               </button>
