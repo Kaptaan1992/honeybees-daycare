@@ -76,6 +76,7 @@ const ChildrenManagement: React.FC = () => {
       id: parentId,
       fullName: formData.get('fullName') as string,
       email: formData.get('email') as string,
+      phone: formData.get('phone') as string,
       relationship: formData.get('relationship') as any,
       preferredLanguage: formData.get('preferredLanguage') as Language,
       receivesEmail: formData.get('receivesEmail') === 'on',
@@ -131,7 +132,7 @@ const ChildrenManagement: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-slate-800">{child.firstName} {child.lastName}</h3>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{child.classroom || 'General Group'}</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{child.classroom || 'Toddlers'}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -178,24 +179,31 @@ const ChildrenManagement: React.FC = () => {
                     const parent = parents.find(p => p.id === pid);
                     if (!parent) return null;
                     return (
-                      <div key={pid} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl group">
-                        <div className="flex-1 min-w-0">
+                      <div key={pid} className="flex flex-col p-3 bg-slate-50 rounded-2xl group border border-transparent hover:border-amber-100 transition-all">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-bold text-slate-700 truncate">{parent.fullName}</p>
                             <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded uppercase">{parent.relationship}</span>
                           </div>
-                          <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${parent.receivesEmail ? 'bg-green-400' : 'bg-slate-300'}`} title={parent.receivesEmail ? 'Receives Emails' : 'Email notifications off'} />
+                            <button 
+                              onClick={() => setParentModal({ isOpen: true, childId: child.id, editingParent: parent })}
+                              className="p-1 text-slate-300 hover:text-amber-500 transition-colors"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-1 space-y-0.5">
+                          <p className="text-xs text-slate-400 flex items-center gap-1 truncate">
                             <Mail size={10} /> {parent.email}
                           </p>
-                        </div>
-                        <div className="flex items-center gap-2 ml-2">
-                          <div className={`w-2 h-2 rounded-full ${parent.receivesEmail ? 'bg-green-400' : 'bg-slate-300'}`} title={parent.receivesEmail ? 'Receives Emails' : 'Email notifications off'} />
-                          <button 
-                            onClick={() => setParentModal({ isOpen: true, childId: child.id, editingParent: parent })}
-                            className="p-1.5 text-slate-300 hover:text-amber-500 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Edit3 size={14} />
-                          </button>
+                          {parent.phone && (
+                            <p className="text-xs text-slate-400 flex items-center gap-1">
+                              <Phone size={10} /> {parent.phone}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
@@ -232,7 +240,11 @@ const ChildrenManagement: React.FC = () => {
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Classroom/Group</label>
-                <input name="classroom" defaultValue={editingChild?.classroom} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+                <select name="classroom" defaultValue={editingChild?.classroom || 'Toddlers'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-sm">
+                  <option value="Infants">Infants</option>
+                  <option value="Toddlers">Toddlers</option>
+                  <option value="Pre school">Pre school</option>
+                </select>
               </div>
             </div>
             <div>
@@ -265,9 +277,15 @@ const ChildrenManagement: React.FC = () => {
               <button type="button" onClick={() => setParentModal({ isOpen: false, childId: null, editingParent: null })} className="text-slate-400"><X /></button>
             </div>
             
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Full Name</label>
-              <input name="fullName" defaultValue={parentModal.editingParent?.fullName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Full Name</label>
+                <input name="fullName" defaultValue={parentModal.editingParent?.fullName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Phone Number</label>
+                <input name="phone" type="tel" placeholder="(555) 000-0000" defaultValue={parentModal.editingParent?.phone} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
             </div>
 
             <div>

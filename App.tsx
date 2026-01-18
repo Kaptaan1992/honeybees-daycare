@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
@@ -10,7 +11,10 @@ import {
   Cloud,
   CloudOff,
   RefreshCw,
-  LogOut
+  LogOut,
+  Sparkles,
+  CalendarCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { Store } from './store';
 import Dashboard from './pages/Dashboard';
@@ -19,23 +23,38 @@ import LogEntry from './pages/LogEntry';
 import ReportPreview from './pages/ReportPreview';
 import SettingsPage from './pages/Settings';
 import HistoryPage from './pages/History';
+import AttendancePage from './pages/Attendance';
+import EmergencyPage from './pages/Emergency';
 import Login from './pages/Login';
 
-const NavItem = ({ to, icon: Icon, label, onClick }: { to: string, icon: any, label: string, onClick?: () => void }) => {
+const NavItem = ({ to, icon: Icon, label, onClick, variant = 'default' }: { to: string, icon: any, label: string, onClick?: () => void, variant?: 'default' | 'emergency' }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
   
+  const colors = {
+    default: {
+      active: 'bg-amber-100 text-amber-900 font-bold shadow-sm',
+      inactive: 'text-slate-600 hover:bg-amber-50',
+      icon: isActive ? 'text-amber-600' : 'text-slate-400'
+    },
+    emergency: {
+      active: 'bg-red-600 text-white font-bold shadow-lg shadow-red-100',
+      inactive: 'text-red-600 hover:bg-red-50 font-bold',
+      icon: isActive ? 'text-white' : 'text-red-500'
+    }
+  };
+
+  const currentStyles = colors[variant];
+
   return (
     <Link 
       to={to} 
       onClick={onClick}
       className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-        isActive 
-          ? 'bg-amber-100 text-amber-900 font-bold shadow-sm' 
-          : 'text-slate-600 hover:bg-amber-50'
+        isActive ? currentStyles.active : currentStyles.inactive
       }`}
     >
-      <Icon size={20} className={isActive ? 'text-amber-600' : 'text-slate-400'} />
+      <Icon size={20} className={currentStyles.icon} />
       <span>{label}</span>
     </Link>
   );
@@ -45,20 +64,58 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCloudEnabled, setIsCloudEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [justSynced, setJustSynced] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(Store.isAuthenticated());
 
   useEffect(() => {
-    const checkCloud = () => {
-      setIsCloudEnabled(Store.isCloudEnabled());
+    let subscription: any = null;
+
+    const initCloudAndRealtime = async () => {
+      const enabled = Store.isCloudEnabled();
+      setIsCloudEnabled(enabled);
+      
+      if (enabled) {
+        // Initial Pull
+        await Store.syncSettingsFromCloud();
+        
+        // Setup Realtime Subscription for Settings
+        const client = Store.getClient();
+        if (client) {
+          subscription = client
+            .channel('public:app_settings')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, async (payload) => {
+              console.log('Remote settings change detected!', payload);
+              const updated = await Store.syncSettingsFromCloud();
+              if (updated) {
+                setJustSynced(true);
+                setTimeout(() => setJustSynced(false), 3000);
+              }
+            })
+            .subscribe();
+        }
+      }
     };
-    checkCloud();
-    const interval = setInterval(checkCloud, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    initCloudAndRealtime();
+
+    const checkInterval = setInterval(() => {
+      const enabled = Store.isCloudEnabled();
+      if (enabled !== isCloudEnabled) {
+        setIsCloudEnabled(enabled);
+        if (enabled && !subscription) initCloudAndRealtime();
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(checkInterval);
+      if (subscription) subscription.unsubscribe();
+    };
+  }, [isCloudEnabled]);
 
   const handleManualSync = async () => {
     setIsSyncing(true);
     await Store.syncLocalToCloud();
+    await Store.syncSettingsFromCloud();
     setTimeout(() => setIsSyncing(false), 1000);
   };
 
@@ -91,11 +148,22 @@ const App: React.FC = () => {
           <nav className="flex-1 space-y-1">
             <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
             <NavItem to="/children" icon={Baby} label="Children" />
+            <NavItem to="/attendance" icon={CalendarCheck} label="Attendance" />
             <NavItem to="/history" icon={History} label="History" />
             <NavItem to="/settings" icon={SettingsIcon} label="Settings" />
+            <div className="pt-4 mt-4 border-t border-slate-50">
+               <NavItem to="/emergency" icon={ShieldAlert} label="Emergency" variant="emergency" />
+            </div>
           </nav>
 
           <div className="mt-auto space-y-2">
+            {justSynced && (
+              <div className="flex items-center justify-center gap-2 py-2 px-4 bg-green-50 text-green-600 rounded-xl text-[10px] font-bold uppercase animate-bounce">
+                <Sparkles size={12}/>
+                <span>Settings Updated</span>
+              </div>
+            )}
+            
             <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest ${isCloudEnabled ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
               {isCloudEnabled ? <Cloud size={14}/> : <CloudOff size={14}/>}
               <span>{isCloudEnabled ? 'Cloud Sync Active' : 'Local Only Mode'}</span>
@@ -133,6 +201,7 @@ const App: React.FC = () => {
             <span className="font-brand font-bold text-amber-900">Honeybees</span>
           </div>
           <div className="flex items-center gap-2">
+             {justSynced && <Sparkles size={18} className="text-green-500 animate-pulse" />}
              <div className={`p-1.5 rounded-full ${isCloudEnabled ? 'text-blue-500' : 'text-slate-300'}`}>
                {isCloudEnabled ? <Cloud size={18}/> : <CloudOff size={18}/>}
              </div>
@@ -148,8 +217,10 @@ const App: React.FC = () => {
             <nav className="space-y-2">
               <NavItem to="/" icon={LayoutDashboard} label="Dashboard" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/children" icon={Baby} label="Children" onClick={() => setIsMenuOpen(false)} />
+              <NavItem to="/attendance" icon={CalendarCheck} label="Attendance" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/history" icon={History} label="History" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/settings" icon={SettingsIcon} label="Settings" onClick={() => setIsMenuOpen(false)} />
+              <NavItem to="/emergency" icon={ShieldAlert} label="Emergency Info" variant="emergency" onClick={() => setIsMenuOpen(false)} />
               <button 
                 onClick={handleLogout}
                 className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all mt-4"
@@ -171,6 +242,8 @@ const App: React.FC = () => {
               <Route path="/report/:childId/:date" element={<ReportPreview />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/history" element={<HistoryPage />} />
+              <Route path="/attendance" element={<AttendancePage />} />
+              <Route path="/emergency" element={<EmergencyPage />} />
             </Routes>
           </div>
         </main>

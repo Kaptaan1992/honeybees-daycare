@@ -3,18 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store } from '../store';
 import { DailyLog, Child, EmailSendLog } from '../types';
-import { Calendar, Eye, Send, Filter, CheckCircle, Loader2, Trash2 } from 'lucide-react';
-
-const format12h = (timeStr: string) => {
-  if (!timeStr) return '';
-  const [hours, minutes] = timeStr.split(':');
-  let h = parseInt(hours);
-  const m = minutes || '00';
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12;
-  return `${h}:${m} ${ampm}`;
-};
+import { Calendar, Eye, Send, Filter, CheckCircle, Loader2, Trash2, UserX } from 'lucide-react';
 
 const HistoryPage: React.FC = () => {
   const [logs, setLogs] = useState<DailyLog[]>([]);
@@ -30,7 +19,10 @@ const HistoryPage: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     const allLogs = await Store.getDailyLogs();
-    setLogs(allLogs.sort((a, b) => b.date.localeCompare(a.date)));
+    // Only show logs where the child was actually present
+    const attendanceOnly = allLogs.filter(l => l.isPresent);
+    setLogs(attendanceOnly.sort((a, b) => b.date.localeCompare(a.date)));
+    
     setChildren(await Store.getChildren());
     setSendLogs(await Store.getSendLogs());
     setIsLoading(false);
@@ -46,7 +38,10 @@ const HistoryPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-brand font-extrabold text-amber-900">History</h1>
+        <div>
+          <h1 className="text-3xl font-brand font-extrabold text-amber-900">Report History</h1>
+          <p className="text-slate-500 font-medium">Record of completed daily logs for children who were present.</p>
+        </div>
         <div className="flex gap-2">
           <button className="p-2 bg-white rounded-xl border border-amber-100 text-slate-400 hover:text-amber-600 shadow-sm">
             <Filter size={18} />
@@ -99,7 +94,7 @@ const HistoryPage: React.FC = () => {
                               <CheckCircle size={10} /> Sent
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-[10px] font-extrabold text-slate-400 bg-slate-50 px-2 py-1 rounded-full uppercase">
+                            <span className="flex items-center gap-1 text-[10px] font-extrabold text-amber-600 bg-amber-50 px-2 py-1 rounded-full uppercase">
                                Draft
                             </span>
                           )}
@@ -135,8 +130,11 @@ const HistoryPage: React.FC = () => {
                 })}
                 {logs.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-20 text-center text-slate-400 font-medium italic">
-                      No history logs found yet. Start by logging today's activities!
+                    <td colSpan={5} className="px-6 py-20 text-center">
+                       <div className="flex flex-col items-center gap-3 text-slate-400">
+                         <UserX size={40} className="text-slate-200" />
+                         <p className="font-medium italic">No reports found in history. Reports only appear for children who were checked in.</p>
+                       </div>
                     </td>
                   </tr>
                 )}

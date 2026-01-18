@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Store } from '../store';
 import { Settings } from '../types';
@@ -14,7 +15,8 @@ import {
   Lock,
   AlertCircle,
   Smartphone,
-  ChevronRight
+  ChevronRight,
+  Copy
 } from 'lucide-react';
 
 const SettingsPage: React.FC = () => {
@@ -239,6 +241,24 @@ const SettingsPage: React.FC = () => {
 
               <div className="h-px bg-slate-50 my-2" />
 
+              <label className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl cursor-pointer hover:bg-amber-100 transition-colors">
+                <div className="bg-white p-2 rounded-xl shadow-sm text-amber-600">
+                  <Copy size={16} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-amber-900">Staff Records (BCC)</p>
+                  <p className="text-[10px] text-amber-700/60 font-medium">Automatically send a copy of every daily report to your email.</p>
+                </div>
+                <input 
+                  type="checkbox" 
+                  className="w-5 h-5 accent-amber-600 rounded-lg"
+                  checked={settings.sendCopyToSelfDefault || false}
+                  onChange={e => setSettings({...settings, sendCopyToSelfDefault: e.target.checked})}
+                />
+              </label>
+
+              <div className="h-px bg-slate-50 my-2" />
+
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1 mb-1">
                   <ShieldCheck size={12}/> Service ID
@@ -291,6 +311,16 @@ const SettingsPage: React.FC = () => {
                   className="w-full px-4 py-3 bg-slate-50 rounded-2xl focus:ring-2 focus:ring-amber-400 outline-none transition-all"
                   value={settings.daycareName}
                   onChange={e => setSettings({...settings, daycareName: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Daycare Contact Email (for self-copies)</label>
+                <input 
+                  type="email" 
+                  className="w-full px-4 py-3 bg-slate-50 rounded-2xl focus:ring-2 focus:ring-amber-400 outline-none transition-all text-sm"
+                  value={settings.fromEmail}
+                  onChange={e => setSettings({...settings, fromEmail: e.target.value})}
                 />
               </div>
 

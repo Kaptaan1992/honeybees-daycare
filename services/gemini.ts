@@ -2,11 +2,12 @@
 import { GoogleGenAI } from "@google/genai";
 import { DailyLog, Child, Parent } from "../types";
 
-// Always use process.env.API_KEY directly for initialization as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const generateDailySummary = async (log: DailyLog, child: Child, parent: Parent) => {
   if (!process.env.API_KEY) return log.teacherNotes;
+
+  // Always use process.env.API_KEY directly for initialization as per guidelines.
+  // We instantiate a new instance right before use to ensure freshness.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const prompt = `
     Generate a warm, professional, and very CONCISE daycare daily summary (max 60 words).
@@ -28,6 +29,7 @@ export const generateDailySummary = async (log: DailyLog, child: Child, parent: 
       model: "gemini-3-flash-preview",
       contents: prompt,
     });
+    // Use .text property directly as per latest Gemini API guidelines
     return response.text || log.teacherNotes;
   } catch (error) {
     console.error("Gemini Summarization Error:", error);

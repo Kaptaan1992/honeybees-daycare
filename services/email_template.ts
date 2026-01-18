@@ -25,6 +25,11 @@ export const generateEmailBody = (log: DailyLog, child: Child, settings: Setting
   if (log.naps.length > 0) routines.push(`${log.naps.length} Naps: ${log.naps.map(n => `${format12h(n.startTime)}-${format12h(n.endTime)}`).join(', ')}`);
   if (log.diapers.length > 0) routines.push(`${log.diapers.length} Diapers: ${log.diapers.map(d => `${format12h(d.time)} ${d.type}`).join(', ')}`);
   
+  if (log.activities.length > 0) {
+    routines.push(`Activities: ${log.activities.map(a => a.category).join(', ')}`);
+    if (log.activityNotes) routines.push(`Activity Notes: ${log.activityNotes}`);
+  }
+
   if (routines.length > 0) {
     sections.push(`\nDETAILS:\n${routines.join('\n')}`);
   }
@@ -66,7 +71,11 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
   ];
   const napDetails = log.naps.map(n => `<b>${format12h(n.startTime)} - ${format12h(n.endTime)}:</b> ${n.quality}`);
   const diaperDetails = log.diapers.map(d => `<b>${format12h(d.time)}:</b> ${d.type}`);
-  const activityDetails = log.activities.map(a => `<b>${a.category}:</b> ${a.description.substring(0, 35)}${a.description.length > 35 ? '...' : ''}`);
+  
+  const activityDetails: string[] = log.activities.map(a => a.category);
+  if (log.activityNotes) {
+    activityDetails.push(`<i>Note: ${log.activityNotes}</i>`);
+  }
 
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fffbeb; padding: 10px;">

@@ -71,11 +71,19 @@ CREATE TABLE send_logs (
   "sentAt" TIMESTAMP WITH TIME ZONE,
   status TEXT
 );
-```
 
-### 🛠 Migration for existing users
-If you already created your tables, just run this single line to add the new medication field:
-`ALTER TABLE children ADD COLUMN "dailyMedications" JSONB DEFAULT '[]';`
+CREATE TABLE app_settings (
+  id TEXT PRIMARY KEY,
+  data JSONB NOT NULL
+);
+
+-- Enable Realtime
+alter publication supabase_realtime add table children;
+alter publication supabase_realtime add table parents;
+alter publication supabase_realtime add table daily_logs;
+alter publication supabase_realtime add table send_logs;
+alter publication supabase_realtime add table app_settings;
+```
 
 3.  **Config**: In the Honeybees **Settings** page, enter your Supabase URL and Anon Key. Your data will now sync automatically!
 

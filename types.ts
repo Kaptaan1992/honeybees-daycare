@@ -96,6 +96,7 @@ export interface DailyLog {
   departureTime: string;
   overallMood: Mood;
   teacherNotes: string;
+  activityNotes: string; // Shared notes for activities
   suppliesNeeded: string;
   meals: MealEntry[];
   bottles: BottleEntry[];
@@ -105,6 +106,7 @@ export interface DailyLog {
   medications: MedicationEntry[];
   incidents: IncidentEntry[];
   status: 'In Progress' | 'Completed' | 'Sent';
+  isPresent: boolean; // NEW: Attendance tracking
 }
 
 export interface Settings {
@@ -114,6 +116,7 @@ export interface Settings {
   testEmail: string;
   adminPassword?: string; // Stored password
   autoSendTime?: string;
+  sendCopyToSelfDefault?: boolean; // New setting
   // EmailJS Integration
   emailjsServiceId?: string;
   emailjsTemplateId?: string;

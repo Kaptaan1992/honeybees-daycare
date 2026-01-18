@@ -40,10 +40,11 @@ const INITIAL_SETTINGS: Settings = {
   fromEmail: 'reports@honeybeesdaycare.com',
   emailSignature: 'With love,\nHoneybees Daycare Team',
   testEmail: '',
-  adminPassword: 'honeybees2025', // Default password
+  adminPassword: 'honeybees2025',
   emailjsServiceId: '',
   emailjsTemplateId: '',
   emailjsPublicKey: '',
+  sendCopyToSelfDefault: false,
 };
 
 export class Store {
@@ -53,8 +54,13 @@ export class Store {
     if (this.client) return this.client;
     const settings = this.getSettings();
     if (settings.supabaseUrl && settings.supabaseAnonKey) {
-      this.client = createClient(settings.supabaseUrl, settings.supabaseAnonKey);
-      return this.client;
+      try {
+        this.client = createClient(settings.supabaseUrl, settings.supabaseAnonKey);
+        return this.client;
+      } catch (e) {
+        console.error("Supabase Init Error:", e);
+        return null;
+      }
     }
     return null;
   }
@@ -66,11 +72,17 @@ export class Store {
   static async syncLocalToCloud() {
     const client = this.getClient();
     if (!client) return;
-    const { count } = await client.from('children').select('*', { count: 'exact', head: true });
-    if (count === 0) {
-      await client.from('children').insert(this.getChildrenLocal());
-      await client.from('parents').insert(this.getParentsLocal());
-      await client.from('daily_logs').insert(this.getDailyLogsLocal());
+
+    try {
+      const { count } = await client.from('children').select('*', { count: 'exact', head: true });
+      if (count === 0) {
+        await client.from('children').insert(this.getChildrenLocal());
+        await client.from('parents').insert(this.getParentsLocal());
+        await client.from('daily_logs').insert(this.getDailyLogsLocal());
+      }
+      await this.syncSettingsToCloud();
+    } catch (e) {
+      console.error("Initial Sync Error:", e);
     }
   }
 
@@ -97,9 +109,51 @@ export class Store {
     return settings;
   }
 
-  static saveSettings(settings: Settings) {
+  static async saveSettings(settings: Settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    this.client = null;
+    this.client = null; 
+    await this.syncSettingsToCloud();
+  }
+
+  private static async syncSettingsToCloud() {
+    const client = this.getClient();
+    if (!client) return;
+    
+    const settings = this.getSettings();
+    await client.from('app_settings').upsert({
+      id: 'global',
+      data: settings
+    });
+  }
+
+  static async syncSettingsFromCloud(): Promise<Settings | null> {
+    const client = this.getClient();
+    if (!client) return null;
+
+    try {
+      const { data, error } = await client
+        .from('app_settings')
+        .select('data')
+        .eq('id', 'global')
+        .maybeSingle();
+
+      if (!error && data && data.data) {
+        const cloudSettings = data.data;
+        const localSettings = this.getSettings();
+        
+        const mergedSettings = {
+          ...cloudSettings,
+          supabaseUrl: localSettings.supabaseUrl,
+          supabaseAnonKey: localSettings.supabaseAnonKey
+        };
+
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(mergedSettings));
+        return mergedSettings;
+      }
+    } catch (e) {
+      console.error("Cloud settings sync failed:", e);
+    }
+    return null;
   }
 
   // --- Children ---
@@ -111,10 +165,14 @@ export class Store {
   static async getChildren(): Promise<Child[]> {
     const client = this.getClient();
     if (client) {
-      const { data, error } = await client.from('children').select('*');
-      if (!error && data) {
-        localStorage.setItem(STORAGE_KEYS.CHILDREN, JSON.stringify(data));
-        return data as Child[];
+      try {
+        const { data, error } = await client.from('children').select('*');
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEYS.CHILDREN, JSON.stringify(data));
+          return data as Child[];
+        }
+      } catch (e) {
+        console.warn("Using local children due to error:", e);
       }
     }
     return this.getChildrenLocal();
@@ -148,10 +206,14 @@ export class Store {
   static async getParents(): Promise<Parent[]> {
     const client = this.getClient();
     if (client) {
-      const { data, error } = await client.from('parents').select('*');
-      if (!error && data) {
-        localStorage.setItem(STORAGE_KEYS.PARENTS, JSON.stringify(data));
-        return data as Parent[];
+      try {
+        const { data, error } = await client.from('parents').select('*');
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEYS.PARENTS, JSON.stringify(data));
+          return data as Parent[];
+        }
+      } catch (e) {
+        console.warn("Using local parents due to error:", e);
       }
     }
     return this.getParentsLocal();
@@ -174,10 +236,14 @@ export class Store {
   static async getDailyLogs(): Promise<DailyLog[]> {
     const client = this.getClient();
     if (client) {
-      const { data, error } = await client.from('daily_logs').select('*');
-      if (!error && data) {
-        localStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(data));
-        return data as DailyLog[];
+      try {
+        const { data, error } = await client.from('daily_logs').select('*');
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(data));
+          return data as DailyLog[];
+        }
+      } catch (e) {
+        console.warn("Using local logs due to error:", e);
       }
     }
     return this.getDailyLogsLocal();
@@ -207,7 +273,9 @@ export class Store {
     const existing = logs.find(l => l.childId === childId && l.date === date);
     if (existing) return {
       ...existing,
-      medications: existing.medications || []
+      medications: existing.medications || [],
+      activityNotes: existing.activityNotes || '',
+      isPresent: existing.isPresent ?? false
     };
 
     const newLog: DailyLog = {
@@ -218,6 +286,7 @@ export class Store {
       departureTime: '17:30',
       overallMood: 'Great',
       teacherNotes: '',
+      activityNotes: '',
       suppliesNeeded: '',
       meals: [],
       bottles: [],
@@ -226,7 +295,8 @@ export class Store {
       activities: [],
       medications: [],
       incidents: [],
-      status: 'In Progress'
+      status: 'In Progress',
+      isPresent: false
     };
     logs.push(newLog);
     await this.saveDailyLogs(logs);
@@ -242,10 +312,14 @@ export class Store {
   static async getSendLogs(): Promise<EmailSendLog[]> {
     const client = this.getClient();
     if (client) {
-      const { data, error } = await client.from('send_logs').select('*');
-      if (!error && data) {
-        localStorage.setItem(STORAGE_KEYS.SEND_LOGS, JSON.stringify(data));
-        return data as EmailSendLog[];
+      try {
+        const { data, error } = await client.from('send_logs').select('*');
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEYS.SEND_LOGS, JSON.stringify(data));
+          return data as EmailSendLog[];
+        }
+      } catch (e) {
+        console.warn("Using local send logs due to error:", e);
       }
     }
     return this.getSendLogsLocal();

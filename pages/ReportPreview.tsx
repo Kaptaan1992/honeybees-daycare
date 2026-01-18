@@ -24,7 +24,8 @@ import {
   Eye,
   Send,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Copy
 } from 'lucide-react';
 
 const ReportPreview: React.FC = () => {
@@ -40,6 +41,7 @@ const ReportPreview: React.FC = () => {
   const [isSentSuccessfully, setIsSentSuccessfully] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sendCopyToSelf, setSendCopyToSelf] = useState(false);
   
   // UI State
   const [editingParentId, setEditingParentId] = useState<string | null>(null);
@@ -65,12 +67,14 @@ const ReportPreview: React.FC = () => {
           return;
         }
 
-        // Use getOrCreate so the preview doesn't hang if a log was recently deleted
         const foundLog = await Store.getOrCreateDailyLog(childId, date);
         const allParents = await Store.getParents();
+        const appSettings = Store.getSettings();
         
         setChild(foundChild);
         setLog(foundLog);
+        setSettings(appSettings);
+        setSendCopyToSelf(appSettings.sendCopyToSelfDefault || false);
         setParents(allParents.filter(p => foundChild.parentIds.includes(p.id)));
         setAiSummary(foundLog.teacherNotes || "A wonderful day of learning and play!");
       } catch (err) {
@@ -113,12 +117,19 @@ const ReportPreview: React.FC = () => {
   const emailContentHtml = log && child ? generateHtmlEmailBody(log, child, settings, aiSummary) : '';
 
   const handleSendEmail = async (isTest = false) => {
-    const recipients = isTest 
+    let recipients = isTest 
       ? [settings.testEmail || settings.fromEmail] 
       : parents.filter(p => p.receivesEmail).map(p => p.email);
 
+    // Add daycare's own email if the toggle is on
+    if (!isTest && sendCopyToSelf && settings.fromEmail) {
+      if (!recipients.includes(settings.fromEmail)) {
+        recipients.push(settings.fromEmail);
+      }
+    }
+
     if (recipients.length === 0 || !recipients[0]) {
-      alert(isTest ? "Please set a Test Email in Settings first!" : "No valid parent recipients selected.");
+      alert(isTest ? "Please set a Test Email in Settings first!" : "No valid recipients selected.");
       return;
     }
 
@@ -220,7 +231,7 @@ const ReportPreview: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className="space-y-6 pb-40 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <button onClick={() => navigate(`/log/${childId}`)} className="p-2 -ml-2 text-slate-400 hover:text-amber-600 transition-colors">
           <ArrowLeft />
@@ -339,21 +350,44 @@ const ReportPreview: React.FC = () => {
             </div>
           </section>
 
-          <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-gradient-to-t from-amber-50 to-transparent flex flex-col items-center gap-2">
-            {!settings.emailjsPublicKey && (
-              <div className="flex items-center gap-2 text-[10px] font-bold text-amber-800 bg-amber-100/80 px-4 py-1.5 rounded-full mb-1 backdrop-blur-sm">
-                <AlertCircle size={12} />
-                <span>No EmailJS keys found. Will use default mail app.</span>
-              </div>
-            )}
-            <button 
-              onClick={() => handleSendEmail(false)}
-              disabled={isSending}
-              className="w-full max-w-2xl flex items-center justify-center gap-3 bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-5 rounded-3xl shadow-2xl shadow-amber-200 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-            >
-              {isSending ? <Loader2 className="animate-spin" /> : <Send size={20} />}
-              <span>{isSending ? 'Sending to Parents...' : 'Confirm & Send Report Now'}</span>
-            </button>
+          <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-white/80 backdrop-blur-md border-t border-amber-100 flex flex-col items-center gap-4">
+            {/* Copy to Self Toggle - Per Report */}
+            <div className="w-full max-w-2xl px-2">
+              <label className="flex items-center justify-between p-3 bg-amber-50 rounded-2xl border border-amber-100 cursor-pointer hover:bg-amber-100/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center shadow-sm text-amber-600">
+                    <Copy size={16} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-tight text-amber-900 leading-none mb-0.5">Report Records</p>
+                    <p className="text-[10px] font-medium text-amber-700/60">Send copy to staff email ({settings.fromEmail})</p>
+                  </div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  className="w-5 h-5 accent-amber-600 rounded-lg"
+                  checked={sendCopyToSelf}
+                  onChange={e => setSendCopyToSelf(e.target.checked)}
+                />
+              </label>
+            </div>
+
+            <div className="w-full max-w-2xl flex flex-col items-center gap-2">
+              {!settings.emailjsPublicKey && (
+                <div className="flex items-center gap-2 text-[10px] font-bold text-amber-800 bg-amber-100/80 px-4 py-1.5 rounded-full mb-1">
+                  <AlertCircle size={12} />
+                  <span>Using default mail app (no EmailJS keys).</span>
+                </div>
+              )}
+              <button 
+                onClick={() => handleSendEmail(false)}
+                disabled={isSending}
+                className="w-full flex items-center justify-center gap-3 bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-5 rounded-3xl shadow-2xl shadow-amber-200 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+              >
+                {isSending ? <Loader2 className="animate-spin" /> : <Send size={20} />}
+                <span>{isSending ? 'Sending to Recipients...' : 'Confirm & Send Report Now'}</span>
+              </button>
+            </div>
           </div>
         </>
       )}
