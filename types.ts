@@ -31,6 +31,14 @@ export interface Parent {
   receivesEmail: boolean;
 }
 
+export interface Holiday {
+  id: string;
+  name: string;
+  date: string; // YYYY-MM-DD
+  type: 'Closed' | 'Half Day' | 'Break';
+  notes?: string;
+}
+
 export interface MealEntry {
   id: string;
   time: string;
@@ -106,7 +114,8 @@ export interface DailyLog {
   medications: MedicationEntry[];
   incidents: IncidentEntry[];
   status: 'In Progress' | 'Completed' | 'Sent';
-  isPresent: boolean; // NEW: Attendance tracking
+  isPresent: boolean;
+  includeTrends?: boolean; // NEW: Optional toggle for report
 }
 
 export interface Settings {

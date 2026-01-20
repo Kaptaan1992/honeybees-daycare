@@ -77,7 +77,7 @@ const AttendancePage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 pb-20 max-w-md mx-auto">
+    <div className="space-y-6 pb-20 max-w-md mx-auto print:max-w-none print:space-y-4 print:pb-0 print:mx-0">
       <header className="flex flex-col gap-2 print:hidden px-2">
         <h1 className="text-3xl font-brand font-extrabold text-amber-900">Attendance</h1>
         <p className="text-slate-500 text-sm font-medium">Child-by-child monthly tracking.</p>
@@ -104,29 +104,29 @@ const AttendancePage: React.FC = () => {
       </section>
 
       {/* Month Navigator */}
-      <section className="bg-white rounded-3xl border border-amber-100 p-4 shadow-sm flex items-center justify-between mx-2">
-        <button onClick={() => changeMonth(-1)} className="p-2 text-slate-400 hover:text-amber-600">
+      <section className="bg-white rounded-3xl border border-amber-100 p-4 shadow-sm flex items-center justify-between mx-2 print:mx-0 print:border-none print:rounded-none">
+        <button onClick={() => changeMonth(-1)} className="p-2 text-slate-400 hover:text-amber-600 print:hidden">
           <ChevronLeft size={20} />
         </button>
         <div className="text-center">
           <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">{year}</p>
           <h2 className="text-lg font-extrabold text-slate-800">{monthName}</h2>
         </div>
-        <button onClick={() => changeMonth(1)} className="p-2 text-slate-400 hover:text-amber-600">
+        <button onClick={() => changeMonth(1)} className="p-2 text-slate-400 hover:text-amber-600 print:hidden">
           <ChevronRight size={20} />
         </button>
       </section>
 
       {/* The Vertical Mini-Calendar */}
-      <div className="bg-white rounded-[2.5rem] border border-amber-100 shadow-xl overflow-hidden mx-2">
-        <div className="p-6 bg-amber-50/50 border-b border-amber-100 flex items-center justify-between">
+      <div className="bg-white rounded-[2.5rem] border border-amber-100 shadow-xl overflow-hidden mx-2 print:mx-0 print:border-slate-200 print:rounded-3xl print:shadow-none">
+        <div className="p-6 bg-amber-50/50 border-b border-amber-100 flex items-center justify-between print:bg-white print:border-slate-100">
           <div className="flex items-center gap-2">
-            <div className="bg-white p-2 rounded-xl shadow-sm">
+            <div className="bg-white p-2 rounded-xl shadow-sm print:shadow-none print:border print:border-slate-100">
               <CalendarCheck size={18} className="text-amber-600" />
             </div>
             <div>
-               <h3 className="font-extrabold text-slate-800 leading-none">{selectedChild?.firstName}'s Log</h3>
-               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-tighter">Monthly Calendar View</p>
+               <h3 className="font-extrabold text-slate-800 leading-none">{selectedChild?.firstName} {selectedChild?.lastName}'s Attendance</h3>
+               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-tighter">Honeybees Daycare Monthly Record</p>
             </div>
           </div>
           <button onClick={() => window.print()} className="p-2 text-slate-400 hover:text-amber-600 print:hidden">
@@ -154,13 +154,13 @@ const AttendancePage: React.FC = () => {
                   key={day}
                   className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all border ${
                     isPresent 
-                      ? 'bg-amber-400 border-amber-500 text-white shadow-sm scale-105' 
-                      : 'bg-slate-50 border-transparent text-slate-300'
+                      ? 'bg-amber-400 border-amber-500 text-white shadow-sm scale-105 print:bg-amber-100 print:text-amber-900 print:border-amber-300 print:scale-100' 
+                      : 'bg-slate-50 border-transparent text-slate-300 print:bg-white print:border-slate-50'
                   }`}
                 >
                   <span className={`text-xs font-bold ${isPresent ? 'text-amber-900' : ''}`}>{day}</span>
                   {isPresent && (
-                    <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
+                    <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm print:hidden">
                       <img src="https://img.icons8.com/color/16/bee.png" alt="bee" className="w-2.5 h-2.5" />
                     </div>
                   )}
@@ -170,14 +170,14 @@ const AttendancePage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50">
-            <div className="bg-slate-50 p-4 rounded-2xl">
+            <div className="bg-slate-50 p-4 rounded-2xl print:bg-white print:border print:border-slate-100">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Days Present</p>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-2xl font-black text-amber-600">{getMonthlyTotal(selectedChildId!)}</span>
                 <span className="text-xs text-slate-400 font-bold">/ {daysInMonth}</span>
               </div>
             </div>
-            <div className="bg-slate-50 p-4 rounded-2xl flex flex-col justify-center">
+            <div className="bg-slate-50 p-4 rounded-2xl flex flex-col justify-center print:bg-white print:border print:border-slate-100">
               <div className="flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-amber-400"></div>
                  <span className="text-[10px] font-bold text-slate-600 uppercase">Present</span>

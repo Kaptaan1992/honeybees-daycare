@@ -14,7 +14,9 @@ import {
   LogOut,
   Sparkles,
   CalendarCheck,
-  ShieldAlert
+  ShieldAlert,
+  Calendar,
+  LineChart
 } from 'lucide-react';
 import { Store } from './store';
 import Dashboard from './pages/Dashboard';
@@ -25,6 +27,8 @@ import SettingsPage from './pages/Settings';
 import HistoryPage from './pages/History';
 import AttendancePage from './pages/Attendance';
 import EmergencyPage from './pages/Emergency';
+import HolidayManagement from './pages/HolidayManagement';
+import TrendsPage from './pages/Trends';
 import Login from './pages/Login';
 
 const NavItem = ({ to, icon: Icon, label, onClick, variant = 'default' }: { to: string, icon: any, label: string, onClick?: () => void, variant?: 'default' | 'emergency' }) => {
@@ -75,16 +79,13 @@ const App: React.FC = () => {
       setIsCloudEnabled(enabled);
       
       if (enabled) {
-        // Initial Pull
         await Store.syncSettingsFromCloud();
         
-        // Setup Realtime Subscription for Settings
         const client = Store.getClient();
         if (client) {
           subscription = client
             .channel('public:app_settings')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, async (payload) => {
-              console.log('Remote settings change detected!', payload);
               const updated = await Store.syncSettingsFromCloud();
               if (updated) {
                 setJustSynced(true);
@@ -136,8 +137,7 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="flex min-h-screen bg-amber-50">
-        {/* Desktop Sidebar */}
-        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-amber-100 shadow-sm fixed h-full p-4">
+        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-amber-100 shadow-sm fixed h-full p-4 print:hidden">
           <div className="flex items-center space-x-3 mb-10 px-4 pt-2">
             <div className="bg-amber-400 p-2 rounded-lg">
               <img src="https://img.icons8.com/color/48/bee.png" alt="logo" className="w-8 h-8" />
@@ -149,6 +149,8 @@ const App: React.FC = () => {
             <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
             <NavItem to="/children" icon={Baby} label="Children" />
             <NavItem to="/attendance" icon={CalendarCheck} label="Attendance" />
+            <NavItem to="/trends" icon={LineChart} label="Trends" />
+            <NavItem to="/closures" icon={Calendar} label="Closures" />
             <NavItem to="/history" icon={History} label="History" />
             <NavItem to="/settings" icon={SettingsIcon} label="Settings" />
             <div className="pt-4 mt-4 border-t border-slate-50">
@@ -194,8 +196,7 @@ const App: React.FC = () => {
           </div>
         </aside>
 
-        {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between w-full bg-white px-4 py-3 border-b border-amber-100 fixed top-0 z-50">
+        <div className="md:hidden flex items-center justify-between w-full bg-white px-4 py-3 border-b border-amber-100 fixed top-0 z-50 print:hidden">
           <div className="flex items-center space-x-2">
             <img src="https://img.icons8.com/color/48/bee.png" alt="logo" className="w-6 h-6" />
             <span className="font-brand font-bold text-amber-900">Honeybees</span>
@@ -211,13 +212,14 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Menu Overlay */}
         {isMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-40 bg-white pt-16 px-4">
+          <div className="md:hidden fixed inset-0 z-40 bg-white pt-16 px-4 print:hidden">
             <nav className="space-y-2">
               <NavItem to="/" icon={LayoutDashboard} label="Dashboard" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/children" icon={Baby} label="Children" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/attendance" icon={CalendarCheck} label="Attendance" onClick={() => setIsMenuOpen(false)} />
+              <NavItem to="/trends" icon={LineChart} label="Trends" onClick={() => setIsMenuOpen(false)} />
+              <NavItem to="/closures" icon={Calendar} label="Closures" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/history" icon={History} label="History" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/settings" icon={SettingsIcon} label="Settings" onClick={() => setIsMenuOpen(false)} />
               <NavItem to="/emergency" icon={ShieldAlert} label="Emergency Info" variant="emergency" onClick={() => setIsMenuOpen(false)} />
@@ -232,9 +234,8 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Main Content Area */}
-        <main className="flex-1 md:ml-64 pt-16 md:pt-0 min-h-screen">
-          <div className="max-w-4xl mx-auto p-4 md:p-8 pb-24">
+        <main className="flex-1 md:ml-64 pt-16 md:pt-0 min-h-screen print:ml-0 print:pt-0">
+          <div className="max-w-4xl mx-auto p-4 md:p-8 pb-24 print:p-0 print:max-w-none">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/children" element={<ChildrenManagement />} />
@@ -243,7 +244,9 @@ const App: React.FC = () => {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/attendance" element={<AttendancePage />} />
+              <Route path="/trends" element={<TrendsPage />} />
               <Route path="/emergency" element={<EmergencyPage />} />
+              <Route path="/closures" element={<HolidayManagement />} />
             </Routes>
           </div>
         </main>

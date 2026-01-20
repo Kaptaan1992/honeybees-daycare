@@ -16,6 +16,7 @@ import {
   NapQuality,
   DiaperType
 } from '../types';
+import { getTodayDateStr, getCurrentTimeStr, format12h } from '../utils/dates';
 import { 
   ArrowLeft, 
   Utensils, 
@@ -40,25 +41,6 @@ import {
   Star
 } from 'lucide-react';
 
-const format12h = (timeStr: string) => {
-  if (!timeStr) return '--:--';
-  const [hours, minutes] = timeStr.split(':');
-  let h = parseInt(hours);
-  const m = minutes || '00';
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12;
-  return `${h}:${m} ${ampm}`;
-};
-
-const getTodayDateStr = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const LogEntry: React.FC = () => {
   const { childId } = useParams<{ childId: string }>();
   const navigate = useNavigate();
@@ -70,60 +52,54 @@ const LogEntry: React.FC = () => {
   const loadData = useCallback(async (dateToLoad: string) => {
     if (!childId) return;
     setIsLoading(true);
-    const allChildren = await Store.getChildren();
-    const foundChild = allChildren.find(c => c.id === childId);
-    if (foundChild) {
-      setChild(foundChild);
-      const dailyLog = await Store.getOrCreateDailyLog(childId, dateToLoad);
-      setLog(dailyLog);
+    try {
+      const allChildren = await Store.getChildren();
+      const foundChild = allChildren.find(c => c.id === childId);
+      if (foundChild) {
+        setChild(foundChild);
+        const dailyLog = await Store.getOrCreateDailyLog(childId, dateToLoad);
+        setLog(dailyLog);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [childId]);
 
   useEffect(() => {
     loadData(currentDate);
-    const interval = setInterval(() => {
-      const nowStr = getTodayDateStr();
-      if (nowStr !== currentDate) setCurrentDate(nowStr);
-    }, 30000);
-    return () => clearInterval(interval);
   }, [currentDate, loadData]);
 
   const updateLog = async (updates: Partial<DailyLog>) => {
     if (!log) return;
     const newLog = { ...log, ...updates };
     setLog(newLog);
-    const allLogs = await Store.getDailyLogs();
-    const index = allLogs.findIndex(l => l.id === log.id);
-    if (index !== -1) allLogs[index] = newLog;
-    else allLogs.push(newLog);
-    await Store.saveDailyLogs(allLogs);
+    await Store.saveDailyLog(newLog);
   };
 
-  const getCurrentTime24 = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
   const addMeal = () => {
-    const meal: MealEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTime24(), type: 'Snack', items: '', amount: 'All' };
+    const meal: MealEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTimeStr(), type: 'Snack', items: '', amount: 'All' };
     updateLog({ meals: [...log!.meals, meal] });
   };
 
-  const addBottle = () => {
-    const bottle: BottleEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTime24(), type: 'Milk', amount: '4oz' };
+  const addMilk = () => {
+    const bottle: BottleEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTimeStr(), type: 'Milk', amount: '4oz' };
     updateLog({ bottles: [...log!.bottles, bottle] });
   };
 
   const addNap = () => {
-    const nap: NapEntry = { id: Math.random().toString(36).substr(2, 9), startTime: getCurrentTime24(), endTime: '', quality: 'Great' };
+    const nap: NapEntry = { id: Math.random().toString(36).substr(2, 9), startTime: getCurrentTimeStr(), endTime: '', quality: 'Great' };
     updateLog({ naps: [...log!.naps, nap] });
   };
 
   const addDiaper = () => {
-    const diaper: DiaperPottyEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTime24(), type: 'Wet' };
+    const diaper: DiaperPottyEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTimeStr(), type: 'Wet' };
     updateLog({ diapers: [...log!.diapers, diaper] });
   };
 
   const addMedication = () => {
-    const med: MedicationEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTime24(), name: '', dosage: '' };
+    const med: MedicationEntry = { id: Math.random().toString(36).substr(2, 9), time: getCurrentTimeStr(), name: '', dosage: '' };
     updateLog({ medications: [...(log!.medications || []), med] });
   };
 
@@ -137,7 +113,7 @@ const LogEntry: React.FC = () => {
         id: Math.random().toString(36).substr(2, 9), 
         category: category as any, 
         description: '', 
-        time: getCurrentTime24() 
+        time: getCurrentTimeStr() 
       };
       updateLog({ activities: [...log.activities, newActivity] });
     }
@@ -216,7 +192,7 @@ const LogEntry: React.FC = () => {
       {/* Routine Quick Add */}
       <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
         <ActionButton icon={Utensils} label="Meal" color="amber" onClick={addMeal} />
-        <ActionButton icon={Baby} label="Bottle" color="blue" onClick={addBottle} />
+        <ActionButton icon={Baby} label="Milk" color="blue" onClick={addMilk} />
         <ActionButton icon={Moon} label="Nap" color="purple" onClick={addNap} />
         <ActionButton icon={Wind} label="Diaper" color="emerald" onClick={addDiaper} />
         <ActionButton icon={Pill} label="Meds" color="indigo" onClick={addMedication} />
@@ -225,12 +201,12 @@ const LogEntry: React.FC = () => {
       <div className="space-y-4">
         <MedicationList items={log.medications || []} childMeds={child.dailyMedications || []} onUpdate={(id, updates) => updateEntry('medications', id, updates)} onRemove={(id) => removeEntry('medications', id)} />
         <MealList items={log.meals} onUpdate={(id, updates) => updateEntry('meals', id, updates)} onRemove={(id) => removeEntry('meals', id)} />
-        <BottleList items={log.bottles} onUpdate={(id, updates) => updateEntry('bottles', id, updates)} onRemove={(id) => removeEntry('bottles', id)} />
+        <MilkList items={log.bottles} onUpdate={(id, updates) => updateEntry('bottles', id, updates)} onRemove={(id) => removeEntry('bottles', id)} />
         <NapList items={log.naps} onUpdate={(id, updates) => updateEntry('naps', id, updates)} onRemove={(id) => removeEntry('naps', id)} />
         <DiaperList items={log.diapers} onUpdate={(id, updates) => updateEntry('diapers', id, updates)} onRemove={(id) => removeEntry('diapers', id)} />
       </div>
 
-      {/* Activity Multi-Select Section */}
+      {/* Activity Highlights */}
       <section className="bg-white rounded-3xl border border-rose-100 p-6 shadow-sm border-l-4 border-l-rose-400 space-y-4">
         <h3 className="font-bold text-slate-800 flex items-center gap-2">
           <Palette size={18} className="text-rose-500" />
@@ -282,6 +258,7 @@ const LogEntry: React.FC = () => {
   );
 };
 
+// ... subcomponents ...
 const ActivityToggle = ({ category, icon: Icon, isActive, onClick }: { category: string, icon: any, isActive: boolean, onClick: () => void }) => (
   <button 
     onClick={onClick}
@@ -365,13 +342,18 @@ const MealList = ({ items, onUpdate, onRemove }: { items: MealEntry[], onUpdate:
         {items.map(item => (
           <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-3 rounded-2xl">
             <div className="col-span-3">
+              <div className="text-[8px] font-bold text-amber-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
               <input type="time" className="w-full bg-white border-none rounded-lg p-1 text-[10px] font-bold text-amber-600 outline-none" value={item.time} onChange={(e) => onUpdate(item.id, { time: e.target.value })} />
             </div>
-            <select className="col-span-4 bg-white border-none rounded-lg p-1.5 text-[10px] font-medium outline-none" value={item.type} onChange={(e) => onUpdate(item.id, { type: e.target.value })}>
-              {['Breakfast', 'Lunch', 'Snack', 'Other'].map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input type="text" placeholder="Eaten..." className="col-span-4 bg-white border-none rounded-lg p-1.5 text-[10px] outline-none" value={item.items} onChange={(e) => onUpdate(item.id, { items: e.target.value })} />
-            <button onClick={() => onRemove(item.id)} className="col-span-1 text-red-300 hover:text-red-500"><Trash2 size={16} /></button>
+            <div className="col-span-4 mt-3">
+              <select className="w-full bg-white border-none rounded-lg p-1.5 text-[10px] font-medium outline-none" value={item.type} onChange={(e) => onUpdate(item.id, { type: e.target.value })}>
+                {['Breakfast', 'Lunch', 'Snack', 'Other'].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-span-4 mt-3">
+              <input type="text" placeholder="Eaten..." className="w-full bg-white border-none rounded-lg p-1.5 text-[10px] outline-none" value={item.items} onChange={(e) => onUpdate(item.id, { items: e.target.value })} />
+            </div>
+            <button onClick={() => onRemove(item.id)} className="col-span-1 text-red-300 hover:text-red-500 self-center"><Trash2 size={16} /></button>
             <div className="col-span-12 flex gap-1 mt-2">
               {(['All', 'Most', 'Some', 'Little'] as MealAmount[]).map(a => (
                 <button key={a} onClick={() => onUpdate(item.id, { amount: a })} className={`flex-1 py-1 text-[9px] font-bold rounded-lg border transition-all ${item.amount === a ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-white border-slate-100 text-slate-400'}`}>{a}</button>
@@ -384,20 +366,27 @@ const MealList = ({ items, onUpdate, onRemove }: { items: MealEntry[], onUpdate:
   );
 };
 
-const BottleList = ({ items, onUpdate, onRemove }: { items: BottleEntry[], onUpdate: (id: string, updates: any) => void, onRemove: (id: string) => void }) => {
+const MilkList = ({ items, onUpdate, onRemove }: { items: BottleEntry[], onUpdate: (id: string, updates: any) => void, onRemove: (id: string) => void }) => {
   if (items.length === 0) return null;
   return (
     <div className="bg-white rounded-3xl border border-blue-50 p-6 shadow-sm border-l-4 border-l-blue-400">
-      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Baby size={18} className="text-blue-500" /> Bottles</h3>
+      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Baby size={18} className="text-blue-500" /> Milk</h3>
       <div className="space-y-3">
         {items.map(item => (
           <div key={item.id} className="flex items-center gap-2 bg-blue-50/50 p-3 rounded-2xl">
-            <input type="time" className="bg-white border-none rounded-lg p-1 text-[10px] font-bold text-blue-600 outline-none" value={item.time} onChange={(e) => onUpdate(item.id, { time: e.target.value })} />
-            <select className="bg-white border-none rounded-lg p-1.5 text-[10px] flex-1 outline-none" value={item.type} onChange={(e) => onUpdate(item.id, { type: e.target.value })}>
-              {['Milk', 'Formula', 'Water'].map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input type="text" className="bg-white border-none p-1.5 text-[10px] w-16 rounded-lg outline-none" value={item.amount} onChange={(e) => onUpdate(item.id, { amount: e.target.value })} />
-            <button onClick={() => onRemove(item.id)} className="text-red-300"><Trash2 size={16} /></button>
+            <div className="w-20">
+              <div className="text-[8px] font-bold text-blue-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
+              <input type="time" className="bg-white border-none rounded-lg p-1 text-[10px] font-bold text-blue-600 outline-none w-full" value={item.time} onChange={(e) => onUpdate(item.id, { time: e.target.value })} />
+            </div>
+            <div className="flex-1 mt-3">
+              <select className="w-full bg-white border-none rounded-lg p-1.5 text-[10px] outline-none" value={item.type} onChange={(e) => onUpdate(item.id, { type: e.target.value })}>
+                {['Milk', 'Formula', 'Water'].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="w-16 mt-3">
+              <input type="text" className="bg-white border-none p-1.5 text-[10px] w-full rounded-lg outline-none" value={item.amount} onChange={(e) => onUpdate(item.id, { amount: e.target.value })} />
+            </div>
+            <button onClick={() => onRemove(item.id)} className="text-red-300 mt-3"><Trash2 size={16} /></button>
           </div>
         ))}
       </div>
@@ -414,9 +403,15 @@ const NapList = ({ items, onUpdate, onRemove }: { items: NapEntry[], onUpdate: (
         {items.map(item => (
           <div key={item.id} className="bg-purple-50/50 p-3 rounded-2xl space-y-2">
             <div className="flex gap-2">
-              <input type="time" className="bg-white border-none p-1 text-[10px] font-bold text-purple-600 w-full rounded-lg outline-none" value={item.startTime} onChange={(e) => onUpdate(item.id, { startTime: e.target.value })} />
-              <input type="time" className="bg-white border-none p-1 text-[10px] font-bold text-purple-600 w-full rounded-lg outline-none" value={item.endTime} onChange={(e) => onUpdate(item.id, { endTime: e.target.value })} />
-              <button onClick={() => onRemove(item.id)} className="text-red-300"><Trash2 size={16} /></button>
+              <div className="flex-1">
+                <div className="text-[8px] font-bold text-purple-400 uppercase ml-1 mb-0.5">Start: {format12h(item.startTime)}</div>
+                <input type="time" className="bg-white border-none p-1 text-[10px] font-bold text-purple-600 w-full rounded-lg outline-none" value={item.startTime} onChange={(e) => onUpdate(item.id, { startTime: e.target.value })} />
+              </div>
+              <div className="flex-1">
+                <div className="text-[8px] font-bold text-purple-400 uppercase ml-1 mb-0.5">End: {format12h(item.endTime)}</div>
+                <input type="time" className="bg-white border-none p-1 text-[10px] font-bold text-purple-600 w-full rounded-lg outline-none" value={item.endTime} onChange={(e) => onUpdate(item.id, { endTime: e.target.value })} />
+              </div>
+              <button onClick={() => onRemove(item.id)} className="text-red-300 self-end mb-1"><Trash2 size={16} /></button>
             </div>
             <div className="flex gap-1">
               {(['Great', 'Okay', 'Restless'] as NapQuality[]).map(q => (
@@ -438,13 +433,16 @@ const DiaperList = ({ items, onUpdate, onRemove }: { items: DiaperPottyEntry[], 
       <div className="space-y-3">
         {items.map(item => (
           <div key={item.id} className="flex items-center gap-2 bg-emerald-50/50 p-3 rounded-2xl">
-            <input type="time" className="bg-white border-none rounded-lg p-1 text-[10px] font-bold text-emerald-600 outline-none" value={item.time} onChange={(e) => onUpdate(item.id, { time: e.target.value })} />
-            <div className="flex gap-1 flex-1">
+            <div className="w-20">
+              <div className="text-[8px] font-bold text-emerald-400 uppercase ml-1 mb-0.5">{format12h(item.time)}</div>
+              <input type="time" className="bg-white border-none rounded-lg p-1 text-[10px] font-bold text-emerald-600 outline-none w-full" value={item.time} onChange={(e) => onUpdate(item.id, { time: e.target.value })} />
+            </div>
+            <div className="flex gap-1 flex-1 mt-3">
               {(['Wet', 'BM', 'Both', 'Potty'] as DiaperType[]).map(t => (
                 <button key={t} onClick={() => onUpdate(item.id, { type: t })} className={`flex-1 py-1 text-[9px] font-bold rounded-lg border transition-all ${item.type === t ? 'bg-emerald-100 border-emerald-300 text-emerald-700' : 'bg-white border-slate-100 text-slate-400'}`}>{t}</button>
               ))}
             </div>
-            <button onClick={() => onRemove(item.id)} className="text-red-300"><Trash2 size={16} /></button>
+            <button onClick={() => onRemove(item.id)} className="text-red-300 mt-3"><Trash2 size={16} /></button>
           </div>
         ))}
       </div>

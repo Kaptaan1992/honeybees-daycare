@@ -1,5 +1,6 @@
 
-import { DailyLog, Child, Parent, Settings, MealEntry, BottleEntry, NapEntry, DiaperPottyEntry, MedicationEntry } from "../types";
+import { DailyLog, Child, Parent, Settings, Holiday } from "../types";
+import { Store } from "../store";
 
 const format12h = (timeStr: string) => {
   if (!timeStr) return '';
@@ -12,16 +13,39 @@ const format12h = (timeStr: string) => {
   return `${h}:${m} ${ampm}`;
 };
 
-export const generateEmailBody = (log: DailyLog, child: Child, settings: Settings, aiSummary?: string): string => {
+const getUpcomingHolidays = (logs: Holiday[], reportDate: string): Holiday[] => {
+  const rDate = new Date(reportDate.replace(/-/g, '/'));
+  const thirtyDaysLater = new Date(rDate);
+  thirtyDaysLater.setDate(rDate.getDate() + 30);
+
+  return logs.filter(h => {
+    const hDate = new Date(h.date.replace(/-/g, '/'));
+    return hDate >= rDate && hDate <= thirtyDaysLater;
+  }).sort((a, b) => a.date.localeCompare(b.date));
+};
+
+export const generateEmailBody = (log: DailyLog, child: Child, settings: Settings, aiSummary?: string, holidays: Holiday[] = []): string => {
   const sections = [];
   sections.push(`REPORT: ${child.firstName} - ${log.date}`);
+
+  const upcoming = getUpcomingHolidays(holidays, log.date);
+  if (upcoming.length > 0) {
+    sections.push(`\nUPCOMING CLOSURES:`);
+    upcoming.forEach(h => sections.push(`${h.date}: ${h.name} (${h.type})`));
+  }
+
   sections.push(`Mood: ${log.overallMood} | In: ${format12h(log.arrivalTime)} | Out: ${format12h(log.departureTime)}`);
-  sections.push(`\nSUMMARY: ${aiSummary || log.teacherNotes || 'A great day!'}`);
+  
+  if (log.suppliesNeeded) {
+    sections.push(`\nSUPPLIES NEEDED: ${log.suppliesNeeded}`);
+  }
+
+  sections.push(`\nNOTES FOR PARENTS: ${aiSummary || log.teacherNotes || 'A great day!'}`);
   
   const routines = [];
   if (log.medications && log.medications.length > 0) routines.push(`Meds: ${log.medications.map(m => `${format12h(m.time)} ${m.name}`).join(', ')}`);
   if (log.meals.length > 0) routines.push(`${log.meals.length} Meals: ${log.meals.map(m => `${format12h(m.time)} ${m.type}`).join(', ')}`);
-  if (log.bottles.length > 0) routines.push(`${log.bottles.length} Bottles: ${log.bottles.map(b => `${format12h(b.time)} ${b.amount}`).join(', ')}`);
+  if (log.bottles.length > 0) routines.push(`${log.bottles.length} Milk: ${log.bottles.map(b => `${format12h(b.time)} ${b.amount}`).join(', ')}`);
   if (log.naps.length > 0) routines.push(`${log.naps.length} Naps: ${log.naps.map(n => `${format12h(n.startTime)}-${format12h(n.endTime)}`).join(', ')}`);
   if (log.diapers.length > 0) routines.push(`${log.diapers.length} Diapers: ${log.diapers.map(d => `${format12h(d.time)} ${d.type}`).join(', ')}`);
   
@@ -33,16 +57,12 @@ export const generateEmailBody = (log: DailyLog, child: Child, settings: Setting
   if (routines.length > 0) {
     sections.push(`\nDETAILS:\n${routines.join('\n')}`);
   }
-
-  if (log.suppliesNeeded) {
-    sections.push(`\nNEEDS: ${log.suppliesNeeded}`);
-  }
   
   sections.push(`\n${settings.emailSignature}`);
   return sections.join('\n');
 };
 
-export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Settings, aiSummary?: string): string => {
+export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Settings, aiSummary?: string, holidays: Holiday[] = [], allLogs: DailyLog[] = []): string => {
   const amber400 = '#FBBF24';
   const amber500 = '#F59E0B';
   const amber900 = '#78350F';
@@ -51,12 +71,55 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
   const slate600 = '#475569';
   const slate800 = '#1e293b';
 
+  const upcoming = getUpcomingHolidays(holidays, log.date);
+
+  // Trend Logic (Last 7 Days)
+  let trendHtml = '';
+  if (log.includeTrends && allLogs.length > 0) {
+    const reportDate = new Date(log.date.replace(/-/g, '/'));
+    const startRange = new Date(reportDate);
+    startRange.setDate(reportDate.getDate() - 7);
+    
+    const childLogs = allLogs.filter(l => l.childId === child.id && new Date(l.date.replace(/-/g, '/')) >= startRange && new Date(l.date.replace(/-/g, '/')) <= reportDate);
+    
+    const totalMilk = childLogs.reduce((sum, cl) => sum + cl.bottles.reduce((s, b) => s + (parseInt(b.amount.replace(/\D/g, '')) || 0), 0), 0);
+    const totalNapMin = childLogs.reduce((sum, cl) => sum + cl.naps.reduce((s, n) => {
+      if (!n.startTime || !n.endTime) return s;
+      const [sh, sm] = n.startTime.split(':').map(Number);
+      const [eh, em] = n.endTime.split(':').map(Number);
+      const start = sh * 60 + sm;
+      const end = eh * 60 + em;
+      return s + (end > start ? end - start : 0);
+    }, 0), 0);
+    
+    const count = childLogs.length || 1;
+    const avgMilk = (totalMilk / count).toFixed(1);
+    const avgNap = Math.floor(totalNapMin / count);
+
+    trendHtml = `
+      <div class="trend-box" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 18px; padding: 15px; margin-top: 20px;">
+        <div class="trend-title" style="font-size: 9px; font-weight: 800; color: ${slate400}; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; text-align: center;">7-Day Growth Highlights</div>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="width: 45%;">
+            <div class="trend-label" style="font-size: 8px; font-weight: 800; color: #2563eb; text-transform: uppercase;">Daily Milk Avg</div>
+            <div class="trend-value" style="font-size: 16px; font-weight: 900; color: #1e40af;">${avgMilk} oz</div>
+          </div>
+          <div style="width: 10%; text-align: center; color: #e2e8f0;">|</div>
+          <div style="width: 45%; text-align: right;">
+            <div class="trend-label" style="font-size: 8px; font-weight: 800; color: #4f46e5; text-transform: uppercase;">Daily Nap Avg</div>
+            <div class="trend-value" style="font-size: 16px; font-weight: 900; color: #3730a3;">${avgNap} min</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   const renderSection = (title: string, items: string[]) => {
     if (items.length === 0) return '';
     return `
-      <div style="background-color: #f8fafc; padding: 10px; border-radius: 12px; margin-bottom: 8px; border: 1px solid #f1f5f9;">
-        <div style="font-size: 9px; font-weight: 800; color: ${slate400}; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">${title}</div>
-        <div style="font-size: 11px; color: ${slate600}; line-height: 1.4;">
+      <div class="section-card" style="background-color: #f8fafc; padding: 10px; border-radius: 12px; margin-bottom: 8px; border: 1px solid #f1f5f9;">
+        <div class="section-title" style="font-size: 9px; font-weight: 800; color: ${slate400}; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">${title}</div>
+        <div class="section-content" style="font-size: 11px; color: ${slate600}; line-height: 1.4;">
           ${items.map(item => `<div style="margin-bottom: 2px;">• ${item}</div>`).join('')}
         </div>
       </div>
@@ -64,102 +127,87 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
   };
 
   const medDetails = (log.medications || []).map(m => `<b>${format12h(m.time)} Meds:</b> ${m.name} (${m.dosage})`);
-
   const mealDetails = [
     ...log.meals.map(m => `<b>${format12h(m.time)} ${m.type}:</b> ${m.amount} (${m.items})`),
-    ...log.bottles.map(b => `<b>${format12h(b.time)} Bottle:</b> ${b.amount} ${b.type}`)
+    ...log.bottles.map(b => `<b>${format12h(b.time)} Milk:</b> ${b.amount} ${b.type}`)
   ];
   const napDetails = log.naps.map(n => `<b>${format12h(n.startTime)} - ${format12h(n.endTime)}:</b> ${n.quality}`);
   const diaperDetails = log.diapers.map(d => `<b>${format12h(d.time)}:</b> ${d.type}`);
-  
   const activityDetails: string[] = log.activities.map(a => a.category);
-  if (log.activityNotes) {
-    activityDetails.push(`<i>Note: ${log.activityNotes}</i>`);
-  }
+  if (log.activityNotes) activityDetails.push(`<i>Note: ${log.activityNotes}</i>`);
 
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fffbeb; padding: 10px;">
-      <div style="max-width: 480px; margin: 0 auto; background-color: #ffffff; border-radius: 28px; overflow: hidden; border: 1px solid #fde68a; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
-        
-        <!-- Header -->
+    <html>
+    <head>
+      <meta name="color-scheme" content="light dark">
+      <meta name="supported-color-schemes" content="light dark">
+      <style>
+        :root { color-scheme: light dark; supported-color-schemes: light dark; }
+        @media (prefers-color-scheme: dark) {
+          .email-body { background-color: #0f172a !important; }
+          .main-card { background-color: #1e293b !important; border-color: #334155 !important; }
+          .section-card { background-color: #0f172a !important; border-color: #334155 !important; }
+          .section-title { color: #94a3b8 !important; }
+          .section-content { color: #cbd5e1 !important; }
+          .mood-card { background-color: #0f172a !important; border-color: #f59e0b !important; }
+          .mood-label { color: #fbbf24 !important; }
+          .mood-value { color: #fef3c7 !important; }
+          .time-label { color: #94a3b8 !important; }
+          .time-value { color: #f1f5f9 !important; }
+          .narrative-box { background-color: #0f172a !important; border-color: #334155 !important; }
+          .narrative-text { color: #f1f5f9 !important; }
+          .footer-name { color: #fbbf24 !important; }
+          .footer-sig { color: #94a3b8 !important; }
+          .needs-box { background-color: #450a0a !important; border-color: #991b1b !important; }
+          .needs-label { color: #fca5a5 !important; }
+          .holiday-banner { background-color: #431407 !important; border: 2px dashed #f97316 !important; color: #fdba74 !important; }
+          .holiday-header { color: #fb923c !important; }
+          .holiday-text { color: #fdba74 !important; }
+          .trend-box { background-color: #0f172a !important; border-color: #334155 !important; }
+          .trend-title { color: #94a3b8 !important; }
+          .trend-label { color: #93c5fd !important; }
+          .trend-value { color: #f1f5f9 !important; }
+        }
+      </style>
+    </head>
+    <body class="email-body" style="margin: 0; padding: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fffbeb;">
+      <div class="main-card" style="max-width: 480px; margin: 0 auto; background-color: #ffffff; border-radius: 28px; overflow: hidden; border: 1px solid #fde68a; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
         <div style="background-color: ${amber400}; padding: 18px 15px; text-align: center;">
           <h1 style="margin: 0; color: ${amber900}; font-size: 16px; font-weight: 900; letter-spacing: 0.5px;">${child.firstName.toUpperCase()}'S DAILY BUZZ</h1>
           <div style="display: inline-block; margin-top: 4px; background-color: rgba(255,255,255,0.4); padding: 2px 10px; border-radius: 8px; font-size: 10px; font-weight: bold; color: ${amber900};">${log.date}</div>
         </div>
-
         <div style="padding: 15px;">
+          ${upcoming.length > 0 ? `
+            <div class="holiday-banner" style="background-color: #fff7ed; border: 2px dashed #fb923c; border-radius: 16px; padding: 12px; margin-bottom: 15px; text-align: center;">
+              <div class="holiday-header" style="font-size: 9px; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; color: #c2410c;">Upcoming Closures</div>
+              ${upcoming.map(h => `<div class="holiday-text" style="font-size: 11px; font-weight: bold; color: #9a3412;">${h.date}: ${h.name}</div>`).join('')}
+            </div>` : ''}
           
-          <!-- PROMINENT STATS ROW -->
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
             <tr>
-              <td align="left" valign="middle">
-                <div style="display: inline-block; background-color: #fffbeb; border: 1px solid ${amber400}; padding: 6px 12px; border-radius: 12px; text-align: center;">
-                  <div style="font-size: 9px; font-weight: 800; color: ${amber500}; text-transform: uppercase; margin-bottom: 1px;">Overall Mood</div>
-                  <div style="font-size: 16px; font-weight: 900; color: ${amber900};">${log.overallMood}</div>
-                </div>
-              </td>
-              <td align="right" valign="middle">
-                <table cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td style="padding-right: 8px; border-right: 1px solid #e2e8f0;">
-                       <div style="font-size: 8px; font-weight: 800; color: ${slate500}; text-transform: uppercase; text-align: right;">Check In</div>
-                       <div style="font-size: 13px; font-weight: 900; color: ${slate800}; text-align: right;">${format12h(log.arrivalTime)}</div>
-                    </td>
-                    <td style="padding-left: 8px;">
-                       <div style="font-size: 8px; font-weight: 800; color: ${slate500}; text-transform: uppercase; text-align: left;">Check Out</div>
-                       <div style="font-size: 13px; font-weight: 900; color: ${slate800}; text-align: left;">${format12h(log.departureTime)}</div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
+              <td><div class="mood-card" style="display: inline-block; background-color: #fffbeb; border: 1px solid ${amber400}; padding: 6px 12px; border-radius: 12px; text-align: center;"><div class="mood-label" style="font-size: 9px; font-weight: 800; color: ${amber500};">Mood</div><div class="mood-value" style="font-size: 16px; font-weight: 900; color: ${amber900};">${log.overallMood}</div></div></td>
+              <td align="right"><div class="time-label" style="font-size: 8px; color: ${slate500};">Logged: ${format12h(log.arrivalTime)} - ${format12h(log.departureTime)}</div></td>
             </tr>
           </table>
 
-          <!-- Narrative Summary -->
-          <div style="margin-bottom: 18px; background-color: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #f1f5f9; position: relative;">
-            <div style="position: absolute; top: -8px; left: 15px; background: ${amber400}; color: ${amber900}; font-size: 8px; font-weight: 900; padding: 2px 8px; border-radius: 6px; text-transform: uppercase;">✨ The Daily Highlight</div>
-            <p style="margin: 0; color: ${slate800}; font-size: 13px; line-height: 1.6; font-style: italic; font-weight: 500;">"${aiSummary || log.teacherNotes || 'A wonderful day of learning and growth!'}"</p>
-          </div>
-
-          <!-- Medication Alert (If any) -->
-          ${medDetails.length > 0 ? `
-            <div style="background-color: #eef2ff; border: 1px solid #c7d2fe; padding: 10px; border-radius: 14px; margin-bottom: 15px;">
-              <div style="font-size: 9px; font-weight: 800; color: #4338ca; text-transform: uppercase; margin-bottom: 4px;">💊 Medication Administered</div>
-              <div style="font-size: 11px; color: #3730a3;">
-                ${medDetails.join('<br>')}
-              </div>
-            </div>
-          ` : ''}
-
-          <!-- Compact Detailed Grid -->
+          ${log.suppliesNeeded ? `<div class="needs-box" style="background-color: #fff1f2; padding: 10px; border-radius: 14px; margin-bottom: 15px; text-align: center; border: 1px solid #fda4af;"><span class="needs-label" style="color: #e11d48; font-size: 9px; font-weight: 900; text-transform: uppercase;">⚠️ Supplies Needed: ${log.suppliesNeeded}</span></div>` : ''}
+          
+          <div class="narrative-box" style="margin-bottom: 18px; background-color: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #f1f5f9;"><p class="narrative-text" style="margin: 0; color: ${slate800}; font-size: 13px; line-height: 1.6;">"${aiSummary || log.teacherNotes || 'A wonderful day!'}"</p></div>
+          
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
-              <td width="48%" valign="top">
-                ${renderSection('🥣 Nutrition', mealDetails)}
-                ${renderSection('🛌 Naps & Rest 💤', napDetails)}
-              </td>
+              <td width="48%" valign="top">${renderSection('🥣 Nutrition', mealDetails)}${renderSection('🛌 Naps', napDetails)}</td>
               <td width="4%"></td>
-              <td width="48%" valign="top">
-                ${renderSection('🧷 Potty / Diapers', diaperDetails)}
-                ${renderSection('🎨 Fun Activities', activityDetails)}
-              </td>
+              <td width="48%" valign="top">${renderSection('🧷 Diapers', diaperDetails)}${renderSection('🎨 Activities', activityDetails)}</td>
             </tr>
           </table>
 
-          ${log.suppliesNeeded ? `
-            <div style="background-color: #fff1f2; border: 1px solid #ffe4e6; padding: 10px; border-radius: 14px; margin-top: 10px; text-align: center;">
-              <span style="color: #e11d48; font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Parent Action Needed</span>
-              <p style="margin: 2px 0 0 0; color: #9f1239; font-weight: 700; font-size: 12px;">Bring ${log.suppliesNeeded}</p>
-            </div>
-          ` : ''}
+          ${trendHtml}
 
-          <!-- Footer -->
-          <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 20px;">
-            <div style="font-size: 12px; font-weight: 900; color: ${amber900};">${settings.daycareName.toUpperCase()}</div>
-            <div style="margin-top: 4px; color: ${slate400}; font-size: 10px; line-height: 1.3;">${settings.emailSignature.replace(/\n/g, '<br>')}</div>
-          </div>
+          <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 20px;"><div class="footer-name" style="font-size: 12px; font-weight: 900; color: ${amber900};">${settings.daycareName}</div><div class="footer-sig" style="font-size: 10px; color: ${slate500}; margin-top: 4px;">Honeybees Daycare Portal</div></div>
         </div>
       </div>
-    </div>
+    </body>
+    </html>
   `;
 };
