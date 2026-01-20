@@ -65,6 +65,7 @@ const INITIAL_SETTINGS: Settings = {
   emailjsTemplateId: '',
   emailjsPublicKey: '',
   sendCopyToSelfDefault: false,
+  // ENCODED SUPABASE CREDENTIALS - Placeholders for user to fill in source
   supabaseUrl: '', 
   supabaseAnonKey: ''
 };
@@ -75,12 +76,15 @@ export class Store {
   static getClient(): SupabaseClient | null {
     if (this.client) return this.client;
     const settings = this.getSettings();
-    if (settings.supabaseUrl && settings.supabaseAnonKey && settings.supabaseUrl.includes('supabase.co')) {
+    // Validate URL format before attempting connection
+    if (settings.supabaseUrl && settings.supabaseAnonKey && 
+        settings.supabaseUrl.startsWith('http') && 
+        settings.supabaseUrl.includes('.supabase.co')) {
       try {
         this.client = createClient(settings.supabaseUrl, settings.supabaseAnonKey);
         return this.client;
       } catch (e) {
-        console.error("Supabase Init Error:", e);
+        console.error("Supabase Connection Failed:", e);
         return null;
       }
     }
@@ -88,7 +92,8 @@ export class Store {
   }
 
   static isCloudEnabled(): boolean {
-    return !!this.getClient();
+    const settings = this.getSettings();
+    return !!(settings.supabaseUrl && settings.supabaseAnonKey && settings.supabaseUrl.startsWith('http'));
   }
 
   static async syncLocalToCloud() {
@@ -96,7 +101,10 @@ export class Store {
     if (!client) return;
 
     try {
-      const { count } = await client.from('children').select('*', { count: 'exact', head: true });
+      // Short timeout check for connection
+      const { count, error } = await client.from('children').select('*', { count: 'exact', head: true }).limit(1);
+      if (error) throw error;
+      
       if (count === 0) {
         await client.from('children').insert(this.getChildrenLocal());
         await client.from('parents').insert(this.getParentsLocal());
@@ -105,7 +113,7 @@ export class Store {
       }
       await this.syncSettingsToCloud();
     } catch (e) {
-      console.error("Initial Sync Error:", e);
+      console.error("Supabase Sync Error:", e);
     }
   }
 
@@ -127,12 +135,17 @@ export class Store {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     const settings = data ? JSON.parse(data) : { ...INITIAL_SETTINGS };
     if (!settings.adminPassword) settings.adminPassword = INITIAL_SETTINGS.adminPassword;
+    
+    // Ensure the hardcoded placeholders are used if local storage is empty
+    if (!settings.supabaseUrl && INITIAL_SETTINGS.supabaseUrl) settings.supabaseUrl = INITIAL_SETTINGS.supabaseUrl;
+    if (!settings.supabaseAnonKey && INITIAL_SETTINGS.supabaseAnonKey) settings.supabaseAnonKey = INITIAL_SETTINGS.supabaseAnonKey;
+    
     return settings;
   }
 
   static async saveSettings(settings: Settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    this.client = null; 
+    this.client = null; // Reset client to force re-init with new keys
     await this.syncSettingsToCloud();
   }
 
@@ -140,7 +153,11 @@ export class Store {
     const client = this.getClient();
     if (!client) return;
     const settings = this.getSettings();
-    await client.from('app_settings').upsert({ id: 'global', data: settings });
+    try {
+      await client.from('app_settings').upsert({ id: 'global', data: settings });
+    } catch (e) {
+      console.error("Failed to sync settings to cloud", e);
+    }
   }
 
   static async syncSettingsFromCloud(): Promise<Settings | null> {
@@ -149,7 +166,12 @@ export class Store {
     try {
       const { data, error } = await client.from('app_settings').select('data').eq('id', 'global').maybeSingle();
       if (!error && data && data.data) {
-        const merged = { ...data.data, supabaseUrl: this.getSettings().supabaseUrl, supabaseAnonKey: this.getSettings().supabaseAnonKey };
+        const current = this.getSettings();
+        const merged = { 
+          ...data.data, 
+          supabaseUrl: current.supabaseUrl, 
+          supabaseAnonKey: current.supabaseAnonKey 
+        };
         localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(merged));
         return merged;
       }
@@ -166,11 +188,13 @@ export class Store {
   static async getHolidays(): Promise<Holiday[]> {
     const client = this.getClient();
     if (client) {
-      const { data } = await client.from('holidays').select('*');
-      if (data) {
-        localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(data));
-        return data as Holiday[];
-      }
+      try {
+        const { data, error } = await client.from('holidays').select('*');
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(data));
+          return data as Holiday[];
+        }
+      } catch (e) { console.warn("Holidays sync failed", e); }
     }
     return this.getHolidaysLocal();
   }
@@ -197,11 +221,13 @@ export class Store {
   static async getChildren(): Promise<Child[]> {
     const client = this.getClient();
     if (client) {
-      const { data } = await client.from('children').select('*');
-      if (data) {
-        localStorage.setItem(STORAGE_KEYS.CHILDREN, JSON.stringify(data));
-        return data as Child[];
-      }
+      try {
+        const { data, error } = await client.from('children').select('*');
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEYS.CHILDREN, JSON.stringify(data));
+          return data as Child[];
+        }
+      } catch (e) { console.warn("Children sync failed", e); }
     }
     return this.getChildrenLocal();
   }
@@ -228,11 +254,13 @@ export class Store {
   static async getParents(): Promise<Parent[]> {
     const client = this.getClient();
     if (client) {
-      const { data } = await client.from('parents').select('*');
-      if (data) {
-        localStorage.setItem(STORAGE_KEYS.PARENTS, JSON.stringify(data));
-        return data as Parent[];
-      }
+      try {
+        const { data, error } = await client.from('parents').select('*');
+        if (!error && data) {
+          localStorage.setItem(STORAGE_KEYS.PARENTS, JSON.stringify(data));
+          return data as Parent[];
+        }
+      } catch (e) { console.warn("Parents sync failed", e); }
     }
     return this.getParentsLocal();
   }
@@ -255,17 +283,17 @@ export class Store {
     
     if (client) {
       try {
-        const { data } = await client.from('daily_logs').select('*');
-        if (data) {
+        const { data, error } = await client.from('daily_logs').select('*');
+        if (!error && data) {
           const mergedMap = new Map();
-          data.forEach(item => mergedMap.set(item.id, item));
           local.forEach(item => mergedMap.set(item.id, item));
+          data.forEach(item => mergedMap.set(item.id, item));
           
           const merged = Array.from(mergedMap.values());
           localStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(merged));
           return merged;
         }
-      } catch (e) { console.warn(e); }
+      } catch (e) { console.warn("Logs sync failed", e); }
     }
     return local;
   }
@@ -279,9 +307,9 @@ export class Store {
     
     const client = this.getClient();
     if (client) {
-      client.from('daily_logs').upsert(log).then(({ error }) => {
-        if (error) console.error("Cloud individual log sync failed:", error);
-      });
+      try {
+        await client.from('daily_logs').upsert(log);
+      } catch (e) { console.error("Cloud log save failed", e); }
     }
   }
 
@@ -343,11 +371,13 @@ export class Store {
   static async getSendLogs(): Promise<EmailSendLog[]> {
     const client = this.getClient();
     if (client) {
-      const { data } = await client.from('send_logs').select('*');
-      if (data) {
-        localStorage.setItem(STORAGE_KEYS.SEND_LOGS, JSON.stringify(data));
-        return data as EmailSendLog[];
-      }
+      try {
+        const { data } = await client.from('send_logs').select('*');
+        if (data) {
+          localStorage.setItem(STORAGE_KEYS.SEND_LOGS, JSON.stringify(data));
+          return data as EmailSendLog[];
+        }
+      } catch (e) { console.warn("Send logs sync failed", e); }
     }
     return this.getSendLogsLocal();
   }

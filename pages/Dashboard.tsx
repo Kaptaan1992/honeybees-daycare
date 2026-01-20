@@ -18,22 +18,25 @@ import {
   Smile,
   GraduationCap,
   ShieldAlert,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const [children, setChildren] = useState<Child[]>([]);
   const [logs, setLogs] = useState<Record<string, DailyLog>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [currentDate] = useState(getTodayDateStr());
-  const isSavingRef = useRef(false);
+  const isInitialLoad = useRef(true);
   const navigate = useNavigate();
 
-  // Load initial data
-  const loadData = useCallback(async () => {
-    if (isSavingRef.current) return;
-    setIsLoading(true);
+  const loadData = useCallback(async (isFirst = false) => {
+    // If it's the very first time and we have no children in state, show the full loader
+    if (isFirst && children.length === 0) setIsLoading(true);
+    else setIsSyncing(true);
+    
     try {
       const allChildren = await Store.getChildren();
       const activeChildren = allChildren.filter(c => c.active);
@@ -49,38 +52,31 @@ const Dashboard: React.FC = () => {
       
       setLogs(todayLogs);
     } catch (e) {
-      console.error("Dashboard Load Error:", e);
+      console.error("Dashboard Sync Error:", e);
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
+      isInitialLoad.current = false;
     }
-  }, [currentDate]);
+  }, [currentDate, children.length]);
 
   useEffect(() => {
-    loadData();
+    loadData(isInitialLoad.current);
     
-    // Soft-refresh interval to keep multiple devices in sync
-    const interval = setInterval(async () => {
-      if (isSavingRef.current || isLoading) return;
-      const allLogs = await Store.getDailyLogs();
-      const updated: Record<string, DailyLog> = {};
-      children.forEach(c => {
-        const found = allLogs.find(l => l.childId === c.id && l.date === currentDate);
-        if (found) updated[c.id] = found;
-      });
-      setLogs(prev => ({ ...prev, ...updated }));
-    }, 10000);
+    // Silent background sync
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [currentDate, loadData, children.length, isLoading]);
+    // Explicitly empty deps to run only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
   const handleCheckIn = async (childId: string) => {
-    isSavingRef.current = true;
     const nowTime = getCurrentTimeStr();
-    
-    // Get or create the log for today
     const currentLog = await Store.getOrCreateDailyLog(childId, currentDate);
     
-    // Update arrival time and presence
     const updatedLog: DailyLog = { 
       ...currentLog, 
       isPresent: true, 
@@ -88,19 +84,14 @@ const Dashboard: React.FC = () => {
       status: 'In Progress'
     };
     
-    // Update local state immediately for UI snappiness
     setLogs(prev => ({ ...prev, [childId]: updatedLog }));
-    
-    // Persist to store
     await Store.saveDailyLog(updatedLog);
-    isSavingRef.current = false;
   };
 
   const handleCheckOut = async (childId: string) => {
     const log = logs[childId];
     if (!log) return;
 
-    isSavingRef.current = true;
     const nowTime = getCurrentTimeStr();
     const updatedLog: DailyLog = { 
       ...log, 
@@ -110,7 +101,6 @@ const Dashboard: React.FC = () => {
     
     setLogs(prev => ({ ...prev, [childId]: updatedLog }));
     await Store.saveDailyLog(updatedLog);
-    isSavingRef.current = false;
   };
 
   const handleResetStatus = async (childId: string) => {
@@ -120,11 +110,9 @@ const Dashboard: React.FC = () => {
     const child = children.find(c => c.id === childId);
     if (!window.confirm(`Undo check-in for ${child?.firstName}? This clears today's status.`)) return;
     
-    isSavingRef.current = true;
     const updatedLog: DailyLog = { ...log, isPresent: false, arrivalTime: '08:00', status: 'In Progress' };
     setLogs(prev => ({ ...prev, [childId]: updatedLog }));
     await Store.saveDailyLog(updatedLog);
-    isSavingRef.current = false;
   };
 
   const filteredChildren = children.filter(c => 
@@ -157,7 +145,7 @@ const Dashboard: React.FC = () => {
   if (isLoading) return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-amber-900/40">
        <Loader2 className="animate-spin mb-4" size={32} />
-       <p className="font-bold uppercase tracking-widest text-[10px]">Loading Dashboard...</p>
+       <p className="font-bold uppercase tracking-widest text-[10px]">Loading Hive...</p>
     </div>
   );
 
@@ -165,7 +153,10 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-brand font-extrabold text-amber-900">Today's Buzz</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-brand font-extrabold text-amber-900">Today's Buzz</h1>
+            {isSyncing && <RefreshCw size={14} className="text-amber-300 animate-spin" />}
+          </div>
           <p className="text-slate-500 font-medium">
             {new Date(currentDate.replace(/-/g, '/')).toLocaleDateString('en-US', { 
               weekday: 'long', month: 'long', day: 'numeric'
@@ -195,6 +186,12 @@ const Dashboard: React.FC = () => {
       </header>
 
       <div className="space-y-10">
+        {groupedChildren.length === 0 && !isLoading && (
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-amber-200">
+            <Baby size={48} className="mx-auto text-amber-200 mb-4" />
+            <p className="text-slate-400 font-medium">No children found. Add some in the Children tab!</p>
+          </div>
+        )}
         {groupedChildren.map(([room, roomChildren]) => (
           <div key={room} className="space-y-4">
             <div className="flex items-center gap-2">
