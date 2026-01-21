@@ -6,19 +6,15 @@ import {
   Baby, 
   Settings as SettingsIcon, 
   History, 
-  Menu, 
-  X,
   Cloud,
   CloudOff,
   RefreshCw,
   LogOut,
-  Sparkles,
   CalendarCheck,
   ShieldAlert,
   Calendar,
   LineChart,
-  Activity,
-  ChevronRight
+  Activity
 } from 'lucide-react';
 import { Store } from './store';
 import Dashboard from './pages/Dashboard';
@@ -83,7 +79,6 @@ const MobileTab = ({ to, icon: Icon, label }: { to: string, icon: any, label: st
 };
 
 const App: React.FC = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCloudEnabled, setIsCloudEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
@@ -93,23 +88,31 @@ const App: React.FC = () => {
   useEffect(() => {
     let subscription: any = null;
 
-    const initCloudAndRealtime = async () => {
+    const setupRealtime = async () => {
       const enabled = Store.isCloudEnabled();
       setIsCloudEnabled(enabled);
       
       if (enabled) {
+        // Initial sync of settings
         await Store.syncSettingsFromCloud();
+        
         const client = Store.getClient();
         if (client) {
           subscription = client
-            .channel('honeybees_global_sync')
+            .channel('honeybees_realtime_sync')
             .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
+              // Handle individual table updates for instant syncing
               if (payload.table === 'app_settings') {
                 await Store.syncSettingsFromCloud();
+              } else if (payload.table === 'daily_logs') {
+                Store.handleRealtimeLogUpdate(payload.new as any);
+              } else {
+                // For children, parents, etc - just notify components to refresh
+                window.dispatchEvent(new Event('hb_data_updated'));
               }
+              
               setJustSynced(true);
               setTimeout(() => setJustSynced(false), 2000);
-              window.dispatchEvent(new CustomEvent('hb_data_updated', { detail: payload }));
             })
             .subscribe((status) => {
               setIsRealtimeConnected(status === 'SUBSCRIBED');
@@ -118,13 +121,14 @@ const App: React.FC = () => {
       }
     };
     
-    initCloudAndRealtime();
+    setupRealtime();
 
+    // Health check interval
     const interval = setInterval(() => {
       if (Store.isCloudEnabled() && !isRealtimeConnected) {
-        initCloudAndRealtime();
+        setupRealtime();
       }
-    }, 15000);
+    }, 20000);
 
     return () => {
       clearInterval(interval);
@@ -220,7 +224,7 @@ const App: React.FC = () => {
           <MobileTab to="/" icon={LayoutDashboard} label="Buzz" />
           <MobileTab to="/children" icon={Baby} label="Kids" />
           <MobileTab to="/attendance" icon={CalendarCheck} label="Attendance" />
-          <MobileTab to="/closures" icon={Calendar} label="Closures" />
+          <MobileTab to="/trends" icon={LineChart} label="Trends" />
           <MobileTab to="/emergency" icon={ShieldAlert} label="SOS" />
         </nav>
 
