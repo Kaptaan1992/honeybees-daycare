@@ -16,11 +16,15 @@ export const getCurrentTimeStr = () => {
 };
 
 export const format12h = (timeStr: string) => {
-  if (!timeStr || !timeStr.includes(':')) return '--:--';
-  const [hours, minutes] = timeStr.split(':');
-  let h = parseInt(hours);
+  if (!timeStr || typeof timeStr !== 'string') return '--:--';
+  // Handle HH:MM:SS or HH:MM formats
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return '--:--';
+  
+  let h = parseInt(parts[0]);
   if (isNaN(h)) return '--:--';
-  const m = minutes || '00';
+  
+  const m = parts[1].padStart(2, '0');
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12;
   h = h ? h : 12;

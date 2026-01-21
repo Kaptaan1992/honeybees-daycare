@@ -1,61 +1,65 @@
 
 import { DailyLog, Child, Parent, Settings, Holiday } from "../types";
-import { Store } from "../store";
-
-const format12h = (timeStr: string) => {
-  if (!timeStr) return '';
-  const [hours, minutes] = timeStr.split(':');
-  let h = parseInt(hours);
-  const m = minutes || '00';
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12;
-  return `${h}:${m} ${ampm}`;
-};
+import { format12h } from "../utils/dates";
 
 const getUpcomingHolidays = (logs: Holiday[], reportDate: string): Holiday[] => {
-  const rDate = new Date(reportDate.replace(/-/g, '/'));
-  const thirtyDaysLater = new Date(rDate);
-  thirtyDaysLater.setDate(rDate.getDate() + 30);
+  if (!logs || logs.length === 0) return [];
+  
+  const rDate = reportDate;
+  const thirtyDaysLaterDate = new Date(reportDate.replace(/-/g, '/'));
+  thirtyDaysLaterDate.setDate(thirtyDaysLaterDate.getDate() + 30);
+  const limitDate = thirtyDaysLaterDate.toISOString().split('T')[0];
 
   return logs.filter(h => {
-    const hDate = new Date(h.date.replace(/-/g, '/'));
-    return hDate >= rDate && hDate <= thirtyDaysLater;
+    return h.date >= rDate && h.date <= limitDate;
   }).sort((a, b) => a.date.localeCompare(b.date));
 };
 
 export const generateEmailBody = (log: DailyLog, child: Child, settings: Settings, aiSummary?: string, holidays: Holiday[] = []): string => {
   const sections = [];
-  sections.push(`REPORT: ${child.firstName} - ${log.date}`);
+  sections.push(`DAILY REPORT: ${child.firstName} - ${log.date}`);
 
   const upcoming = getUpcomingHolidays(holidays, log.date);
   if (upcoming.length > 0) {
-    sections.push(`\nUPCOMING CLOSURES:`);
+    sections.push(`\n--- UPCOMING CLOSURES ---`);
     upcoming.forEach(h => sections.push(`${h.date}: ${h.name} (${h.type})`));
   }
 
-  sections.push(`Mood: ${log.overallMood} | In: ${format12h(log.arrivalTime)} | Out: ${format12h(log.departureTime)}`);
+  sections.push(`\nSTATUS:`);
+  sections.push(`Mood: ${log.overallMood}`);
+  sections.push(`Arrival: ${format12h(log.arrivalTime)}`);
+  sections.push(`Departure: ${format12h(log.departureTime)}`);
   
   if (log.suppliesNeeded) {
     sections.push(`\nSUPPLIES NEEDED: ${log.suppliesNeeded}`);
   }
 
-  sections.push(`\nNOTES FOR PARENTS: ${aiSummary || log.teacherNotes || 'A great day!'}`);
+  sections.push(`\nNOTES FOR PARENTS: ${aiSummary || log.teacherNotes || 'A wonderful day!'}`);
   
   const routines = [];
-  if (log.medications && log.medications.length > 0) routines.push(`Meds: ${log.medications.map(m => `${format12h(m.time)} ${m.name}`).join(', ')}`);
-  if (log.meals.length > 0) routines.push(`${log.meals.length} Meals: ${log.meals.map(m => `${format12h(m.time)} ${m.type}`).join(', ')}`);
-  if (log.bottles.length > 0) routines.push(`${log.bottles.length} Milk: ${log.bottles.map(b => `${format12h(b.time)} ${b.amount}`).join(', ')}`);
-  if (log.naps.length > 0) routines.push(`${log.naps.length} Naps: ${log.naps.map(n => `${format12h(n.startTime)}-${format12h(n.endTime)}`).join(', ')}`);
-  if (log.diapers.length > 0) routines.push(`${log.diapers.length} Diapers: ${log.diapers.map(d => `${format12h(d.time)} ${d.type}`).join(', ')}`);
+  if (log.medications && log.medications.length > 0) {
+    routines.push(`Medications: ${log.medications.map(m => `${format12h(m.time)} ${m.name}`).join(', ')}`);
+  }
+  if (log.meals.length > 0) {
+    routines.push(`Meals: ${log.meals.map(m => `${format12h(m.time)} ${m.type} (${m.amount})`).join(', ')}`);
+  }
+  if (log.bottles.length > 0) {
+    routines.push(`Milk: ${log.bottles.map(b => `${format12h(b.time)} ${b.amount}`).join(', ')}`);
+  }
+  if (log.naps.length > 0) {
+    routines.push(`Sleep: ${log.naps.map(n => `${format12h(n.startTime)} - ${format12h(n.endTime)} (${n.quality})`).join(', ')}`);
+  }
+  if (log.diapers.length > 0) {
+    routines.push(`Diapers: ${log.diapers.map(d => `${format12h(d.time)} ${d.type}`).join(', ')}`);
+  }
   
   if (log.activities.length > 0) {
     routines.push(`Activities: ${log.activities.map(a => a.category).join(', ')}`);
-    if (log.activityNotes) routines.push(`Activity Notes: ${log.activityNotes}`);
+    if (log.activityNotes) routines.push(`Activity Note: ${log.activityNotes}`);
   }
 
   if (routines.length > 0) {
-    sections.push(`\nDETAILS:\n${routines.join('\n')}`);
+    sections.push(`\nROUTINE LOGS:\n${routines.join('\n')}`);
   }
   
   sections.push(`\n${settings.emailSignature}`);
@@ -73,7 +77,6 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
 
   const upcoming = getUpcomingHolidays(holidays, log.date);
 
-  // Trend Logic (Last 7 Days)
   let trendHtml = '';
   if (log.includeTrends && allLogs.length > 0) {
     const reportDate = new Date(log.date.replace(/-/g, '/'));
@@ -126,7 +129,7 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
     `;
   };
 
-  const medDetails = (log.medications || []).map(m => `<b>${format12h(m.time)} Meds:</b> ${m.name} (${m.dosage})`);
+  const medDetails = (log.medications || []).map(m => `<b>${format12h(m.time)}:</b> ${m.name} (${m.dosage})`);
   const mealDetails = [
     ...log.meals.map(m => `<b>${format12h(m.time)} ${m.type}:</b> ${m.amount} (${m.items})`),
     ...log.bottles.map(b => `<b>${format12h(b.time)} Milk:</b> ${b.amount} ${b.type}`)
@@ -152,9 +155,11 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
           .mood-card { background-color: #0f172a !important; border-color: #f59e0b !important; }
           .mood-label { color: #fbbf24 !important; }
           .mood-value { color: #fef3c7 !important; }
+          .time-box { border-left-color: #334155 !important; border-top: none !important; }
           .time-label { color: #94a3b8 !important; }
           .time-value { color: #f1f5f9 !important; }
           .narrative-box { background-color: #0f172a !important; border-color: #334155 !important; }
+          .narrative-label { color: ${amber500} !important; }
           .narrative-text { color: #f1f5f9 !important; }
           .footer-name { color: #fbbf24 !important; }
           .footer-sig { color: #94a3b8 !important; }
@@ -185,26 +190,48 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
           
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
             <tr>
-              <td><div class="mood-card" style="display: inline-block; background-color: #fffbeb; border: 1px solid ${amber400}; padding: 6px 12px; border-radius: 12px; text-align: center;"><div class="mood-label" style="font-size: 9px; font-weight: 800; color: ${amber500};">Mood</div><div class="mood-value" style="font-size: 16px; font-weight: 900; color: ${amber900};">${log.overallMood}</div></div></td>
-              <td align="right"><div class="time-label" style="font-size: 8px; color: ${slate500};">Logged: ${format12h(log.arrivalTime)} - ${format12h(log.departureTime)}</div></td>
+              <td width="50%">
+                <div class="mood-card" style="display: inline-block; background-color: #fffbeb; border: 1px solid ${amber400}; padding: 8px 16px; border-radius: 12px; text-align: center;">
+                  <div class="mood-label" style="font-size: 9px; font-weight: 800; color: ${amber500}; text-transform: uppercase;">Overall Mood</div>
+                  <div class="mood-value" style="font-size: 18px; font-weight: 900; color: ${amber900};">${log.overallMood}</div>
+                </div>
+              </td>
+              <td width="50%" align="right">
+                <div class="time-box" style="border-left: 2px solid #f1f5f9; padding-left: 12px; text-align: right;">
+                  <div class="time-label" style="font-size: 9px; font-weight: 800; color: ${slate400}; text-transform: uppercase;">Check In / Out</div>
+                  <div class="time-value" style="font-size: 12px; font-weight: 900; color: ${slate800}; white-space: nowrap;">${format12h(log.arrivalTime)} - ${format12h(log.departureTime)}</div>
+                </div>
+              </td>
             </tr>
           </table>
 
           ${log.suppliesNeeded ? `<div class="needs-box" style="background-color: #fff1f2; padding: 10px; border-radius: 14px; margin-bottom: 15px; text-align: center; border: 1px solid #fda4af;"><span class="needs-label" style="color: #e11d48; font-size: 9px; font-weight: 900; text-transform: uppercase;">⚠️ Supplies Needed: ${log.suppliesNeeded}</span></div>` : ''}
           
-          <div class="narrative-box" style="margin-bottom: 18px; background-color: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #f1f5f9;"><p class="narrative-text" style="margin: 0; color: ${slate800}; font-size: 13px; line-height: 1.6;">"${aiSummary || log.teacherNotes || 'A wonderful day!'}"</p></div>
+          <div class="narrative-box" style="margin-bottom: 18px; background-color: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #f1f5f9;">
+            <div class="narrative-label" style="font-size: 9px; font-weight: 900; color: ${amber500}; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px;">Notes for Parents</div>
+            <p class="narrative-text" style="margin: 0; color: ${slate800}; font-size: 14px; line-height: 1.6; font-style: italic;">"${aiSummary || log.teacherNotes || 'A wonderful day!'}"</p>
+          </div>
           
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
-              <td width="48%" valign="top">${renderSection('🥣 Nutrition', mealDetails)}${renderSection('🛌 Naps', napDetails)}</td>
+              <td width="48%" valign="top">
+                ${renderSection('🥣 Nutrition', mealDetails)}
+                ${renderSection('🛌 Sleep', napDetails)}
+              </td>
               <td width="4%"></td>
-              <td width="48%" valign="top">${renderSection('🧷 Diapers', diaperDetails)}${renderSection('🎨 Activities', activityDetails)}</td>
+              <td width="48%" valign="top">
+                ${renderSection('🧷 Diapers', diaperDetails)}
+                ${renderSection('🎨 Activities', activityDetails)}
+              </td>
             </tr>
           </table>
 
           ${trendHtml}
 
-          <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 20px;"><div class="footer-name" style="font-size: 12px; font-weight: 900; color: ${amber900};">${settings.daycareName}</div><div class="footer-sig" style="font-size: 10px; color: ${slate500}; margin-top: 4px;">Honeybees Daycare Portal</div></div>
+          <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 20px;">
+            <div class="footer-name" style="font-size: 12px; font-weight: 900; color: ${amber900};">${settings.daycareName}</div>
+            <div class="footer-sig" style="font-size: 10px; color: ${slate500}; margin-top: 4px;">Honeybees Daycare Portal</div>
+          </div>
         </div>
       </div>
     </body>

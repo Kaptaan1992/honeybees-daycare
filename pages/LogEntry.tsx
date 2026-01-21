@@ -239,7 +239,7 @@ const LogEntry: React.FC = () => {
 
       <section className="bg-white rounded-3xl border border-amber-100 p-6 shadow-sm space-y-4">
         <div>
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Teacher's General Notes</label>
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Notes for Parents</label>
           <textarea className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-amber-400 min-h-[100px] text-sm outline-none" placeholder="Overall vibe for the day..." value={log.teacherNotes} onChange={(e) => updateLog({ teacherNotes: e.target.value })} />
         </div>
         <div>

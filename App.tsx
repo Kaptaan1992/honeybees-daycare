@@ -17,7 +17,8 @@ import {
   ShieldAlert,
   Calendar,
   LineChart,
-  Activity
+  Activity,
+  ChevronRight
 } from 'lucide-react';
 import { Store } from './store';
 import Dashboard from './pages/Dashboard';
@@ -65,6 +66,22 @@ const NavItem = ({ to, icon: Icon, label, onClick, variant = 'default' }: { to: 
   );
 };
 
+const MobileTab = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+  return (
+    <Link 
+      to={to} 
+      className={`flex flex-col items-center justify-center flex-1 py-2 transition-all ${
+        isActive ? 'text-amber-600 scale-110' : 'text-slate-400'
+      }`}
+    >
+      <Icon size={22} className={isActive ? 'fill-amber-50' : ''} />
+      <span className={`text-[10px] font-bold mt-1 ${isActive ? 'text-amber-700' : 'text-slate-400'}`}>{label}</span>
+    </Link>
+  );
+};
+
 const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCloudEnabled, setIsCloudEnabled] = useState(false);
@@ -84,25 +101,17 @@ const App: React.FC = () => {
         await Store.syncSettingsFromCloud();
         const client = Store.getClient();
         if (client) {
-          // Join the public sync channel
           subscription = client
             .channel('honeybees_global_sync')
             .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
-              console.log('☁️ Realtime Update Received:', payload.table);
-              
-              // Handle settings specifically as they affect app state
               if (payload.table === 'app_settings') {
                 await Store.syncSettingsFromCloud();
               }
-              
               setJustSynced(true);
               setTimeout(() => setJustSynced(false), 2000);
-              
-              // Notify all components that cloud data has changed
               window.dispatchEvent(new CustomEvent('hb_data_updated', { detail: payload }));
             })
             .subscribe((status) => {
-              console.log('📡 Realtime Connection:', status);
               setIsRealtimeConnected(status === 'SUBSCRIBED');
             });
         }
@@ -111,7 +120,6 @@ const App: React.FC = () => {
     
     initCloudAndRealtime();
 
-    // Watchdog to ensure we stay connected
     const interval = setInterval(() => {
       if (Store.isCloudEnabled() && !isRealtimeConnected) {
         initCloudAndRealtime();
@@ -136,7 +144,8 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="flex min-h-screen bg-amber-50">
-        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-amber-100 shadow-sm fixed h-full p-4 print:hidden">
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-amber-100 shadow-sm fixed h-full p-4 print:hidden z-50">
           <div className="flex items-center space-x-3 mb-10 px-4 pt-2">
             <div className="bg-amber-400 p-2 rounded-lg">
               <img src="https://img.icons8.com/color/48/bee.png" alt="logo" className="w-8 h-8" />
@@ -190,8 +199,33 @@ const App: React.FC = () => {
           </div>
         </aside>
 
+        {/* Mobile Header */}
+        <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-amber-100 flex items-center justify-between px-6 z-[60] print:hidden">
+          <div className="flex items-center gap-2">
+            <img src="https://img.icons8.com/color/48/bee.png" alt="logo" className="w-7 h-7" />
+            <span className="font-brand font-black text-amber-900 text-lg">Honeybees</span>
+          </div>
+          <div className="flex items-center gap-3">
+             {isCloudEnabled && (
+               <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-400'}`} />
+             )}
+             <Link to="/settings" className="p-2 text-slate-400 hover:text-amber-600">
+               <SettingsIcon size={20} />
+             </Link>
+          </div>
+        </header>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-xl border-t border-amber-100 flex items-center justify-around px-2 z-[60] shadow-[0_-4px_10px_rgba(0,0,0,0.02)] print:hidden">
+          <MobileTab to="/" icon={LayoutDashboard} label="Buzz" />
+          <MobileTab to="/children" icon={Baby} label="Kids" />
+          <MobileTab to="/attendance" icon={CalendarCheck} label="Attendance" />
+          <MobileTab to="/closures" icon={Calendar} label="Closures" />
+          <MobileTab to="/emergency" icon={ShieldAlert} label="SOS" />
+        </nav>
+
         <main className="flex-1 md:ml-64 pt-16 md:pt-0 min-h-screen">
-          <div className="max-w-4xl mx-auto p-4 md:p-8 pb-24">
+          <div className="max-w-4xl mx-auto p-4 md:p-8 pb-32 md:pb-24">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/children" element={<ChildrenManagement />} />

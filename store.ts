@@ -26,6 +26,46 @@ const INITIAL_SETTINGS: Settings = {
   supabaseAnonKey: 'YOUR_SUPABASE_ANON_KEY'
 };
 
+const SEED_CHILD: Child = {
+  id: 'seed-honeybee-1',
+  firstName: 'Honey',
+  lastName: 'Bee',
+  nickname: 'Buzz',
+  dob: '2023-01-01',
+  classroom: 'Infants',
+  allergies: 'None',
+  active: true,
+  parentIds: ['seed-parent-1']
+};
+
+const SEED_PARENT: Parent = {
+  id: 'seed-parent-1',
+  fullName: 'Mama Bee',
+  email: 'parent@example.com',
+  relationship: 'Mom',
+  preferredLanguage: 'English',
+  receivesEmail: true
+};
+
+const SEED_HOLIDAYS: Holiday[] = [
+  { id: 'h1', name: "Martin Luther King Jr. Day", date: '2026-01-19', type: 'Closed' },
+  { id: 'h2', name: "Presidents' Day", date: '2026-02-16', type: 'Closed' },
+  { id: 'h3', name: "Eid al-Fitr (Tentative)", date: '2026-03-20', type: 'Closed' },
+  { id: 'h4', name: "Memorial Day", date: '2026-05-25', type: 'Closed' },
+  { id: 'h5', name: "Eid al-Adha (Tentative)", date: '2026-05-27', type: 'Closed' },
+  { id: 'h6', name: "Juneteenth", date: '2026-06-19', type: 'Closed' },
+  { id: 'h7', name: "Independence Day (Observed)", date: '2026-07-03', type: 'Closed' },
+  { id: 'h8', name: "Labor Day", date: '2026-09-07', type: 'Closed' },
+  { id: 'h9', name: "Columbus Day / Indigenous Peoples' Day", date: '2026-10-12', type: 'Closed' },
+  { id: 'h10', name: "Veterans Day", date: '2026-11-11', type: 'Closed' },
+  { id: 'h11', name: "Thanksgiving Break", date: '2026-11-26', type: 'Closed' },
+  { id: 'h12', name: "Thanksgiving Break", date: '2026-11-27', type: 'Closed' },
+  { id: 'h13', name: "Christmas Break", date: '2026-12-24', type: 'Closed' },
+  { id: 'h14', name: "Christmas Break", date: '2026-12-25', type: 'Closed' },
+  { id: 'h15', name: "New Year's Eve", date: '2026-12-31', type: 'Half Day' },
+  { id: 'h16', name: "New Year's Day", date: '2027-01-01', type: 'Closed' }
+];
+
 export class Store {
   private static client: SupabaseClient | null = null;
 
@@ -59,7 +99,6 @@ export class Store {
       const { count, error } = await client.from('children').select('*', { count: 'exact', head: true }).limit(1);
       if (error && error.code === '42P01') return;
       
-      // If cloud is empty, push local data up once
       if (count === 0) {
         const localChildren = this.getChildrenLocal();
         if (localChildren.length > 0) await client.from('children').insert(localChildren);
@@ -70,7 +109,7 @@ export class Store {
         const localLogs = this.getDailyLogsLocal();
         if (localLogs.length > 0) await client.from('daily_logs').insert(localLogs);
 
-        const localHolidays = await this.getHolidays();
+        const localHolidays = this.getHolidaysLocal();
         if (localHolidays.length > 0) await client.from('holidays').insert(localHolidays);
       }
       await this.syncSettingsToCloud();
@@ -124,17 +163,26 @@ export class Store {
     return null;
   }
 
+  private static getHolidaysLocal(): Holiday[] {
+    const local = localStorage.getItem(STORAGE_KEYS.HOLIDAYS);
+    const holidays = local ? JSON.parse(local) : [];
+    if (holidays.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(SEED_HOLIDAYS));
+      return SEED_HOLIDAYS;
+    }
+    return holidays;
+  }
+
   static async getHolidays(): Promise<Holiday[]> {
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('holidays').select('*');
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(data));
         return data as Holiday[];
       }
     }
-    const local = localStorage.getItem(STORAGE_KEYS.HOLIDAYS);
-    return local ? JSON.parse(local) : [];
+    return this.getHolidaysLocal();
   }
 
   static async saveHolidays(holidays: Holiday[]) {
@@ -152,14 +200,19 @@ export class Store {
 
   private static getChildrenLocal(): Child[] {
     const data = localStorage.getItem(STORAGE_KEYS.CHILDREN);
-    return data ? JSON.parse(data) : [];
+    const children = data ? JSON.parse(data) : [];
+    if (children.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.CHILDREN, JSON.stringify([SEED_CHILD]));
+      return [SEED_CHILD];
+    }
+    return children;
   }
 
   static async getChildren(): Promise<Child[]> {
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('children').select('*');
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         localStorage.setItem(STORAGE_KEYS.CHILDREN, JSON.stringify(data));
         return data as Child[];
       }
@@ -182,14 +235,19 @@ export class Store {
 
   private static getParentsLocal(): Parent[] {
     const data = localStorage.getItem(STORAGE_KEYS.PARENTS);
-    return data ? JSON.parse(data) : [];
+    const parents = data ? JSON.parse(data) : [];
+    if (parents.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.PARENTS, JSON.stringify([SEED_PARENT]));
+      return [SEED_PARENT];
+    }
+    return parents;
   }
 
   static async getParents(): Promise<Parent[]> {
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('parents').select('*');
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         localStorage.setItem(STORAGE_KEYS.PARENTS, JSON.stringify(data));
         return data as Parent[];
       }
@@ -212,7 +270,7 @@ export class Store {
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('daily_logs').select('*');
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         localStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(data));
         return data as DailyLog[];
       }
