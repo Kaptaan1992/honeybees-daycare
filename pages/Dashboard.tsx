@@ -33,7 +33,6 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   const loadData = useCallback(async (isFirst = false) => {
-    // If it's the very first time and we have no children in state, show the full loader
     if (isFirst && children.length === 0) setIsLoading(true);
     else setIsSyncing(true);
     
@@ -63,15 +62,22 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     loadData(isInitialLoad.current);
     
-    // Silent background sync
+    // Listen for realtime updates from App.tsx
+    const handleRealtimeUpdate = () => {
+      loadData(false);
+    };
+
+    window.addEventListener('hb_data_updated', handleRealtimeUpdate);
+    
     const interval = setInterval(() => {
       loadData(false);
     }, 30000);
 
-    return () => clearInterval(interval);
-    // Explicitly empty deps to run only on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+    return () => {
+      window.removeEventListener('hb_data_updated', handleRealtimeUpdate);
+      clearInterval(interval);
+    };
+  }, [loadData]); 
 
   const handleCheckIn = async (childId: string) => {
     const nowTime = getCurrentTimeStr();

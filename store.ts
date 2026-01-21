@@ -76,9 +76,8 @@ export class Store {
   static getClient(): SupabaseClient | null {
     if (this.client) return this.client;
     const settings = this.getSettings();
-    if (settings.supabaseUrl && settings.supabaseAnonKey && 
-        settings.supabaseUrl.startsWith('http') && 
-        settings.supabaseUrl.includes('.supabase.co')) {
+    const isPlaceholder = settings.supabaseUrl === 'YOUR_SUPABASE_URL';
+    if (!isPlaceholder && settings.supabaseUrl && settings.supabaseAnonKey) {
       try {
         this.client = createClient(settings.supabaseUrl, settings.supabaseAnonKey);
         return this.client;
@@ -148,7 +147,6 @@ export class Store {
 
   static async saveSettings(settings: Settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    // Reset client in case keys changed manually in settings UI
     this.client = null; 
     await this.syncSettingsToCloud();
   }
@@ -158,7 +156,6 @@ export class Store {
     if (!client) return;
     const settings = this.getSettings();
     try {
-      // Save everything except the connection keys (they stay hardcoded or local)
       const { supabaseUrl, supabaseAnonKey, ...syncableData } = settings;
       await client.from('app_settings').upsert({ id: 'global', data: syncableData });
     } catch (e) {
@@ -173,7 +170,6 @@ export class Store {
       const { data, error } = await client.from('app_settings').select('data').eq('id', 'global').maybeSingle();
       if (!error && data && data.data) {
         const current = this.getSettings();
-        // Merge cloud data with our local connection keys
         const merged = { 
           ...current,
           ...data.data,
@@ -293,6 +289,7 @@ export class Store {
       try {
         const { data, error } = await client.from('daily_logs').select('*');
         if (!error && data) {
+          // Merge logic: Cloud data wins.
           const mergedMap = new Map();
           local.forEach(item => mergedMap.set(item.id, item));
           data.forEach(item => mergedMap.set(item.id, item));
