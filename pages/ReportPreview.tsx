@@ -9,7 +9,8 @@ import {
   Parent, 
   DailyLog, 
   Settings,
-  Holiday
+  Holiday,
+  EmailSendLog
 } from '../types';
 import { 
   ArrowLeft, 
@@ -111,6 +112,8 @@ const ReportPreview: React.FC = () => {
     }
 
     setIsSending(true);
+    let success = false;
+
     if (settings.emailjsPublicKey) {
       try {
         const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -131,17 +134,36 @@ const ReportPreview: React.FC = () => {
           })
         });
         if (response.ok) {
-          if (!isTest) {
-            await Store.saveDailyLog({ ...log!, status: 'Sent' });
-            setIsSentSuccessfully(true);
-          }
+          success = true;
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error(e);
+        alert("Failed to send via EmailJS. Check your settings.");
+      }
     } else {
       const mailto = `mailto:${recipients.join(',')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailContentText)}`;
       window.open(mailto);
-      if (!isTest) setIsSentSuccessfully(true);
+      success = true; // For mailto we assume success once opened
     }
+
+    if (success && !isTest) {
+      // 1. Update log status
+      await Store.saveDailyLog({ ...log!, status: 'Sent' });
+      
+      // 2. Save a send log record for history tracking
+      const sendLogRecord: EmailSendLog = {
+        id: Math.random().toString(36).substr(2, 9),
+        dailyLogId: log!.id,
+        sentTo: recipients,
+        subject: emailSubject,
+        sentAt: new Date().toISOString(),
+        status: 'Sent'
+      };
+      await Store.saveSendLog(sendLogRecord);
+      
+      setIsSentSuccessfully(true);
+    }
+    
     setIsSending(false);
   };
 

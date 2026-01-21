@@ -122,6 +122,8 @@ export class Store {
       if (logs.length > 0) await client.from('daily_logs').upsert(logs);
       const holidays = await this.getHolidays();
       if (holidays.length > 0) await client.from('holidays').upsert(holidays);
+      const sendLogs = await this.getSendLogs();
+      if (sendLogs.length > 0) await client.from('send_logs').upsert(sendLogs);
       await this.syncSettingsToCloud();
     } catch (e) { console.error("Full Sync Error:", e); }
   }
@@ -305,9 +307,24 @@ export class Store {
     const client = this.getClient();
     if (client) {
       const { data } = await client.from('send_logs').select('*');
-      if (data) return data as EmailSendLog[];
+      if (data) {
+        localStorage.setItem(STORAGE_KEYS.SEND_LOGS, JSON.stringify(data));
+        return data as EmailSendLog[];
+      }
     }
     const data = localStorage.getItem(STORAGE_KEYS.SEND_LOGS);
     return data ? JSON.parse(data) : [];
+  }
+
+  static async saveSendLog(sendLog: EmailSendLog) {
+    const data = localStorage.getItem(STORAGE_KEYS.SEND_LOGS);
+    const currentLogs = data ? JSON.parse(data) : [];
+    currentLogs.push(sendLog);
+    localStorage.setItem(STORAGE_KEYS.SEND_LOGS, JSON.stringify(currentLogs));
+
+    const client = this.getClient();
+    if (client) {
+      await client.from('send_logs').upsert(sendLog);
+    }
   }
 }

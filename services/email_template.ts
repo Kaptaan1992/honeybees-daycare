@@ -1,4 +1,3 @@
-
 import { DailyLog, Child, Parent, Settings, Holiday } from "../types";
 import { format12h } from "../utils/dates";
 
@@ -34,12 +33,16 @@ export const generateEmailBody = (log: DailyLog, child: Child, settings: Setting
     sections.push(`\nSUPPLIES NEEDED: ${log.suppliesNeeded}`);
   }
 
-  sections.push(`\nNOTES FOR PARENTS: ${aiSummary || log.teacherNotes || 'A wonderful day!'}`);
+  const hasNotes = !!(aiSummary || log.teacherNotes);
+  if (hasNotes) {
+    sections.push(`\nNOTES FOR PARENTS: ${aiSummary || log.teacherNotes}`);
+  }
+
+  if (log.medications && log.medications.length > 0) {
+    sections.push(`\nMEDICATION ADMINISTERED: ${log.medications.map(m => `${format12h(m.time)} ${m.name} (${m.dosage})`).join(', ')}`);
+  }
   
   const routines = [];
-  if (log.medications && log.medications.length > 0) {
-    routines.push(`Medications: ${log.medications.map(m => `${format12h(m.time)} ${m.name}`).join(', ')}`);
-  }
   if (log.meals.length > 0) {
     routines.push(`Meals: ${log.meals.map(m => `${format12h(m.time)} ${m.type} (${m.amount})`).join(', ')}`);
   }
@@ -53,11 +56,6 @@ export const generateEmailBody = (log: DailyLog, child: Child, settings: Setting
     routines.push(`Diapers: ${log.diapers.map(d => `${format12h(d.time)} ${d.type}`).join(', ')}`);
   }
   
-  if (log.activities.length > 0) {
-    routines.push(`Activities: ${log.activities.map(a => a.category).join(', ')}`);
-    if (log.activityNotes) routines.push(`Activity Note: ${log.activityNotes}`);
-  }
-
   if (routines.length > 0) {
     sections.push(`\nROUTINE LOGS:\n${routines.join('\n')}`);
   }
@@ -70,12 +68,16 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
   const amber400 = '#FBBF24';
   const amber500 = '#F59E0B';
   const amber900 = '#78350F';
+  const blue500 = '#3b82f6';
+  const blue600 = '#2563eb';
+  const blue900 = '#1e3a8a';
   const slate400 = '#94a3b8';
   const slate500 = '#64748b';
   const slate600 = '#475569';
   const slate800 = '#1e293b';
 
   const upcoming = getUpcomingHolidays(holidays, log.date);
+  const hasNotes = !!(aiSummary || log.teacherNotes);
 
   let trendHtml = '';
   if (log.includeTrends && allLogs.length > 0) {
@@ -139,6 +141,22 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
   const activityDetails: string[] = log.activities.map(a => a.category);
   if (log.activityNotes) activityDetails.push(`<i>Note: ${log.activityNotes}</i>`);
 
+  const medicationColumn = medDetails.length > 0 ? `
+    <div class="med-box" style="margin-bottom: 18px; background-color: #eff6ff; padding: 15px; border-radius: 20px; border: 1px solid #dbeafe;">
+      <div class="med-label" style="font-size: 9px; font-weight: 900; color: ${blue600}; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px;">💊 Medication Administered</div>
+      <div class="med-text" style="font-size: 12px; color: ${blue900}; line-height: 1.5;">
+        ${medDetails.map(item => `<div style="margin-bottom: 4px;">• ${item}</div>`).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const narrativeBox = hasNotes ? `
+    <div class="narrative-box" style="margin-bottom: 18px; background-color: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #f1f5f9;">
+      <div class="narrative-label" style="font-size: 9px; font-weight: 900; color: ${amber500}; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px;">Notes for Parents</div>
+      <p class="narrative-text" style="margin: 0; color: ${slate800}; font-size: 14px; line-height: 1.6; font-style: italic;">"${aiSummary || log.teacherNotes}"</p>
+    </div>
+  ` : '';
+
   return `
     <html>
     <head>
@@ -161,6 +179,9 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
           .narrative-box { background-color: #0f172a !important; border-color: #334155 !important; }
           .narrative-label { color: ${amber500} !important; }
           .narrative-text { color: #f1f5f9 !important; }
+          .med-box { background-color: #172554 !important; border-color: #3b82f6 !important; }
+          .med-label { color: #93c5fd !important; }
+          .med-text { color: #dbeafe !important; }
           .footer-name { color: #fbbf24 !important; }
           .footer-sig { color: #94a3b8 !important; }
           .needs-box { background-color: #450a0a !important; border-color: #991b1b !important; }
@@ -207,10 +228,9 @@ export const generateHtmlEmailBody = (log: DailyLog, child: Child, settings: Set
 
           ${log.suppliesNeeded ? `<div class="needs-box" style="background-color: #fff1f2; padding: 10px; border-radius: 14px; margin-bottom: 15px; text-align: center; border: 1px solid #fda4af;"><span class="needs-label" style="color: #e11d48; font-size: 9px; font-weight: 900; text-transform: uppercase;">⚠️ Supplies Needed: ${log.suppliesNeeded}</span></div>` : ''}
           
-          <div class="narrative-box" style="margin-bottom: 18px; background-color: #f8fafc; padding: 15px; border-radius: 20px; border: 1px solid #f1f5f9;">
-            <div class="narrative-label" style="font-size: 9px; font-weight: 900; color: ${amber500}; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px;">Notes for Parents</div>
-            <p class="narrative-text" style="margin: 0; color: ${slate800}; font-size: 14px; line-height: 1.6; font-style: italic;">"${aiSummary || log.teacherNotes || 'A wonderful day!'}"</p>
-          </div>
+          ${narrativeBox}
+
+          ${medicationColumn}
           
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>

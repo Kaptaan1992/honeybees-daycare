@@ -70,7 +70,8 @@ const HistoryPage: React.FC = () => {
               <tbody className="divide-y divide-amber-50">
                 {logs.map(log => {
                   const child = children.find(c => c.id === log.childId);
-                  const sendStatus = sendLogs.find(sl => sl.dailyLogId === log.id);
+                  const sendRecord = sendLogs.find(sl => sl.dailyLogId === log.id);
+                  const isSent = !!sendRecord || log.status === 'Sent';
 
                   return (
                     <tr key={log.id} className="hover:bg-amber-50/30 transition-colors">
@@ -89,7 +90,7 @@ const HistoryPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5">
-                          {sendStatus ? (
+                          {isSent ? (
                             <span className="flex items-center gap-1 text-[10px] font-extrabold text-green-600 bg-green-50 px-2 py-1 rounded-full uppercase">
                               <CheckCircle size={10} /> Sent
                             </span>
