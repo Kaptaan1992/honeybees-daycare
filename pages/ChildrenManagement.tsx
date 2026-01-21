@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Store } from '../store';
 import { Child, Parent, Language } from '../types';
-import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Edit3, X, Loader2, Pill } from 'lucide-react';
+import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Edit3, X, Loader2, Pill, Calendar } from 'lucide-react';
 
 const ChildrenManagement: React.FC = () => {
   const [children, setChildren] = useState<Child[]>([]);
@@ -141,6 +141,10 @@ const ChildrenManagement: React.FC = () => {
                 </div>
               </div>
               <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                  <Calendar size={12} className="text-amber-500" />
+                  <span>DOB: {child.dob ? new Date(child.dob.replace(/-/g, '/')).toLocaleDateString() : 'N/A'}</span>
+                </div>
                 {child.dailyMedications && child.dailyMedications.length > 0 && (
                   <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100">
                     <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Pill size={12} /> Daily Meds</p>
@@ -180,29 +184,63 @@ const ChildrenManagement: React.FC = () => {
 
       {(isAddingChild || editingChild) && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <form onSubmit={saveChild} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <form onSubmit={saveChild} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in duration-300">
             <h2 className="text-xl font-bold text-slate-800 mb-4">{editingChild ? 'Edit' : 'Add New'} Child</h2>
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">First Name</label>
-                <input name="firstName" defaultValue={editingChild?.firstName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none" />
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">First Name</label>
+                <input name="firstName" defaultValue={editingChild?.firstName} required className="w-full px-4 py-2.5 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Last Name</label>
-                <input name="lastName" defaultValue={editingChild?.lastName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none" />
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">Last Name</label>
+                <input name="lastName" defaultValue={editingChild?.lastName} required className="w-full px-4 py-2.5 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
               </div>
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Daily Medications</label>
-              <textarea name="dailyMedications" placeholder="Tylenol, Advil..." defaultValue={editingChild?.dailyMedications?.join(', ')} className="w-full px-4 py-2 bg-slate-50 rounded-xl h-20 text-sm" />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">Date of Birth</label>
+                <input 
+                  type="date" 
+                  name="dob" 
+                  defaultValue={editingChild?.dob} 
+                  required 
+                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">Classroom</label>
+                <select 
+                  name="classroom" 
+                  defaultValue={editingChild?.classroom || 'Toddlers'} 
+                  required 
+                  className="w-full px-4 py-2.5 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="Infants">Infants</option>
+                  <option value="Toddlers">Toddlers</option>
+                  <option value="Pre school">Pre school</option>
+                </select>
+              </div>
             </div>
+
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Allergies</label>
-              <textarea name="allergies" defaultValue={editingChild?.allergies} className="w-full px-4 py-2 bg-slate-50 rounded-xl h-20 text-sm" />
+              <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">Daily Medications</label>
+              <textarea name="dailyMedications" placeholder="e.g. Tylenol (as needed), Advil" defaultValue={editingChild?.dailyMedications?.join(', ')} className="w-full px-4 py-2.5 bg-slate-50 rounded-xl h-20 text-sm outline-none focus:ring-2 focus:ring-amber-400" />
             </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">Allergies</label>
+              <textarea name="allergies" defaultValue={editingChild?.allergies} placeholder="List any food or medical allergies..." className="w-full px-4 py-2.5 bg-slate-50 rounded-xl h-20 text-sm outline-none focus:ring-2 focus:ring-amber-400" />
+            </div>
+
             <div className="flex gap-4 pt-4">
-              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3 rounded-2xl">Save Child</button>
-              <button type="button" onClick={() => { setIsAddingChild(false); setEditingChild(null); }} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-2xl">Cancel</button>
+              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-amber-100 hover:bg-amber-700 active:scale-95 transition-all">
+                Save Child Profile
+              </button>
+              <button type="button" onClick={() => { setIsAddingChild(false); setEditingChild(null); }} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3.5 rounded-2xl hover:bg-slate-200 active:scale-95 transition-all">
+                Cancel
+              </button>
             </div>
           </form>
         </div>
@@ -210,14 +248,34 @@ const ChildrenManagement: React.FC = () => {
 
       {parentModal.isOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <form onSubmit={handleParentSave} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4">
+          <form onSubmit={handleParentSave} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4 animate-in zoom-in duration-300">
             <h2 className="text-xl font-bold text-slate-800 mb-4">{parentModal.editingParent ? 'Edit' : 'Add'} Parent Contact</h2>
-            <input name="fullName" defaultValue={parentModal.editingParent?.fullName} required placeholder="Full Name" className="w-full px-4 py-2 bg-slate-50 rounded-xl" />
-            <input name="email" type="email" defaultValue={parentModal.editingParent?.email} required placeholder="Email" className="w-full px-4 py-2 bg-slate-50 rounded-xl" />
-            <input name="phone" defaultValue={parentModal.editingParent?.phone} placeholder="Phone" className="w-full px-4 py-2 bg-slate-50 rounded-xl" />
+            <input name="fullName" defaultValue={parentModal.editingParent?.fullName} required placeholder="Full Name" className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+            <input name="email" type="email" defaultValue={parentModal.editingParent?.email} required placeholder="Email Address" className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+            <input name="phone" defaultValue={parentModal.editingParent?.phone} placeholder="Phone Number" className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">Relationship</label>
+                <select name="relationship" defaultValue={parentModal.editingParent?.relationship || 'Mom'} className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400">
+                  <option value="Mom">Mom</option>
+                  <option value="Dad">Dad</option>
+                  <option value="Guardian">Guardian</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5 ml-1">Language</label>
+                <select name="preferredLanguage" defaultValue={parentModal.editingParent?.preferredLanguage || 'English'} className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400">
+                  <option value="English">English</option>
+                  <option value="Urdu">Urdu</option>
+                  <option value="Punjabi">Punjabi</option>
+                </select>
+              </div>
+            </div>
+
             <div className="flex gap-4 pt-4">
-              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3 rounded-2xl">Save Parent</button>
-              <button type="button" onClick={() => setParentModal({ isOpen: false, childId: null, editingParent: null })} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-2xl">Cancel</button>
+              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-amber-100 hover:bg-amber-700 active:scale-95 transition-all">Save Parent</button>
+              <button type="button" onClick={() => setParentModal({ isOpen: false, childId: null, editingParent: null })} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3.5 rounded-2xl hover:bg-slate-200 active:scale-95 transition-all">Cancel</button>
             </div>
           </form>
         </div>

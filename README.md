@@ -40,3 +40,16 @@ BEGIN
     END LOOP;
 END $$;
 ```
+
+## 🛠 Database Migration (If you already have tables)
+
+If you have already created your database and just need to add the **DOB** and **Classroom** fields without deleting your current children, run this:
+
+```sql
+-- Run this if you are upgrading from an older version
+ALTER TABLE children ADD COLUMN IF NOT EXISTS dob DATE;
+ALTER TABLE children ADD COLUMN IF NOT EXISTS classroom TEXT;
+
+-- Optional: Set a default classroom for existing children
+UPDATE children SET classroom = 'Toddlers' WHERE classroom IS NULL;
+```
