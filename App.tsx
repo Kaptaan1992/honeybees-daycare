@@ -16,7 +16,8 @@ import {
   CalendarCheck,
   ShieldAlert,
   Calendar,
-  LineChart
+  LineChart,
+  Activity
 } from 'lucide-react';
 import { Store } from './store';
 import Dashboard from './pages/Dashboard';
@@ -68,6 +69,7 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCloudEnabled, setIsCloudEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [justSynced, setJustSynced] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(Store.isAuthenticated());
 
@@ -79,65 +81,57 @@ const App: React.FC = () => {
       setIsCloudEnabled(enabled);
       
       if (enabled) {
-        // Initial pull of settings from cloud
         await Store.syncSettingsFromCloud();
-        
         const client = Store.getClient();
         if (client) {
-          // Robust Realtime: Listen for ALL changes to the app_settings table
+          // Join the public sync channel
           subscription = client
-            .channel('app_settings_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, async () => {
-              const updated = await Store.syncSettingsFromCloud();
-              if (updated) {
-                setJustSynced(true);
-                // Dispatch a custom event so the Settings page can re-render if it's open
-                window.dispatchEvent(new Event('hb_settings_updated'));
-                setTimeout(() => setJustSynced(false), 3000);
+            .channel('honeybees_global_sync')
+            .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
+              console.log('☁️ Realtime Update Received:', payload.table);
+              
+              // Handle settings specifically as they affect app state
+              if (payload.table === 'app_settings') {
+                await Store.syncSettingsFromCloud();
               }
+              
+              setJustSynced(true);
+              setTimeout(() => setJustSynced(false), 2000);
+              
+              // Notify all components that cloud data has changed
+              window.dispatchEvent(new CustomEvent('hb_data_updated', { detail: payload }));
             })
-            .subscribe();
+            .subscribe((status) => {
+              console.log('📡 Realtime Connection:', status);
+              setIsRealtimeConnected(status === 'SUBSCRIBED');
+            });
         }
       }
     };
     
     initCloudAndRealtime();
 
-    const checkInterval = setInterval(() => {
-      const enabled = Store.isCloudEnabled();
-      if (enabled !== isCloudEnabled) {
-        setIsCloudEnabled(enabled);
-        if (enabled && !subscription) initCloudAndRealtime();
+    // Watchdog to ensure we stay connected
+    const interval = setInterval(() => {
+      if (Store.isCloudEnabled() && !isRealtimeConnected) {
+        initCloudAndRealtime();
       }
-    }, 10000);
+    }, 15000);
 
     return () => {
-      clearInterval(checkInterval);
+      clearInterval(interval);
       if (subscription) subscription.unsubscribe();
     };
-  }, [isCloudEnabled]);
+  }, [isCloudEnabled, isRealtimeConnected]);
 
   const handleManualSync = async () => {
     setIsSyncing(true);
     await Store.syncLocalToCloud();
-    await Store.syncSettingsFromCloud();
-    window.dispatchEvent(new Event('hb_settings_updated'));
+    window.dispatchEvent(new Event('hb_data_updated'));
     setTimeout(() => setIsSyncing(false), 1000);
   };
 
-  const handleLogin = () => {
-    Store.login();
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    Store.logout();
-    setIsAuthenticated(false);
-  };
-
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
+  if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
 
   return (
     <Router>
@@ -164,17 +158,16 @@ const App: React.FC = () => {
           </nav>
 
           <div className="mt-auto space-y-2">
-            {justSynced && (
-              <div className="flex items-center justify-center gap-2 py-2 px-4 bg-green-50 text-green-600 rounded-xl text-[10px] font-bold uppercase animate-bounce">
-                <Sparkles size={12}/>
-                <span>Settings Updated</span>
+            <div className={`flex items-center justify-between gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest ${isCloudEnabled ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
+              <div className="flex items-center gap-2">
+                {isCloudEnabled ? <Cloud size={14}/> : <CloudOff size={14}/>}
+                <span>{isCloudEnabled ? 'Cloud Sync' : 'Local Only'}</span>
               </div>
-            )}
-            
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest ${isCloudEnabled ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
-              {isCloudEnabled ? <Cloud size={14}/> : <CloudOff size={14}/>}
-              <span>{isCloudEnabled ? 'Cloud Sync Active' : 'Local Only Mode'}</span>
+              {isCloudEnabled && (
+                <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
+              )}
             </div>
+            
             <div className="p-4 bg-amber-50 rounded-2xl flex items-center justify-between">
               <div>
                 <p className="text-xs text-amber-800 font-medium">Logged in as</p>
@@ -184,16 +177,12 @@ const App: React.FC = () => {
                 {isCloudEnabled && (
                   <button 
                     onClick={handleManualSync}
-                    className={`p-2 hover:bg-amber-100 rounded-full transition-all ${isSyncing ? 'animate-spin text-amber-600' : 'text-amber-400'}`}
+                    className={`p-2 hover:bg-amber-100 rounded-full transition-all ${isSyncing || justSynced ? 'animate-spin text-amber-600' : 'text-amber-400'}`}
                   >
-                    <RefreshCw size={14}/>
+                    {justSynced ? <Activity size={14} className="text-green-500" /> : <RefreshCw size={14}/>}
                   </button>
                 )}
-                <button 
-                  onClick={handleLogout}
-                  className="p-2 hover:bg-red-50 text-red-400 hover:text-red-600 rounded-full transition-all"
-                  title="Logout"
-                >
+                <button onClick={() => { Store.logout(); setIsAuthenticated(false); }} className="p-2 hover:bg-red-50 text-red-400 rounded-full">
                   <LogOut size={14}/>
                 </button>
               </div>
@@ -201,46 +190,8 @@ const App: React.FC = () => {
           </div>
         </aside>
 
-        <div className="md:hidden flex items-center justify-between w-full bg-white px-4 py-3 border-b border-amber-100 fixed top-0 z-50 print:hidden">
-          <div className="flex items-center space-x-2">
-            <img src="https://img.icons8.com/color/48/bee.png" alt="logo" className="w-6 h-6" />
-            <span className="font-brand font-bold text-amber-900">Honeybees</span>
-          </div>
-          <div className="flex items-center gap-2">
-             {justSynced && <Sparkles size={18} className="text-green-500 animate-pulse" />}
-             <div className={`p-1.5 rounded-full ${isCloudEnabled ? 'text-blue-500' : 'text-slate-300'}`}>
-               {isCloudEnabled ? <Cloud size={18}/> : <CloudOff size={18}/>}
-             </div>
-             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-slate-600">
-              {isMenuOpen ? <X /> : <Menu />}
-            </button>
-          </div>
-        </div>
-
-        {isMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-40 bg-white pt-16 px-4 print:hidden">
-            <nav className="space-y-2">
-              <NavItem to="/" icon={LayoutDashboard} label="Dashboard" onClick={() => setIsMenuOpen(false)} />
-              <NavItem to="/children" icon={Baby} label="Children" onClick={() => setIsMenuOpen(false)} />
-              <NavItem to="/attendance" icon={CalendarCheck} label="Attendance" onClick={() => setIsMenuOpen(false)} />
-              <NavItem to="/trends" icon={LineChart} label="Trends" onClick={() => setIsMenuOpen(false)} />
-              <NavItem to="/closures" icon={Calendar} label="Closures" onClick={() => setIsMenuOpen(false)} />
-              <NavItem to="/history" icon={History} label="History" onClick={() => setIsMenuOpen(false)} />
-              <NavItem to="/settings" icon={SettingsIcon} label="Settings" onClick={() => setIsMenuOpen(false)} />
-              <NavItem to="/emergency" icon={ShieldAlert} label="Emergency Info" variant="emergency" onClick={() => setIsMenuOpen(false)} />
-              <button 
-                onClick={handleLogout}
-                className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all mt-4"
-              >
-                <LogOut size={20} />
-                <span>Logout</span>
-              </button>
-            </nav>
-          </div>
-        )}
-
-        <main className="flex-1 md:ml-64 pt-16 md:pt-0 min-h-screen print:ml-0 print:pt-0">
-          <div className="max-w-4xl mx-auto p-4 md:p-8 pb-24 print:p-0 print:max-w-none">
+        <main className="flex-1 md:ml-64 pt-16 md:pt-0 min-h-screen">
+          <div className="max-w-4xl mx-auto p-4 md:p-8 pb-24">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/children" element={<ChildrenManagement />} />
