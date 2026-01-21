@@ -79,16 +79,20 @@ const App: React.FC = () => {
       setIsCloudEnabled(enabled);
       
       if (enabled) {
+        // Initial pull of settings from cloud
         await Store.syncSettingsFromCloud();
         
         const client = Store.getClient();
         if (client) {
+          // Robust Realtime: Listen for ALL changes to the app_settings table
           subscription = client
-            .channel('public:app_settings')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, async (payload) => {
+            .channel('app_settings_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, async () => {
               const updated = await Store.syncSettingsFromCloud();
               if (updated) {
                 setJustSynced(true);
+                // Dispatch a custom event so the Settings page can re-render if it's open
+                window.dispatchEvent(new Event('hb_settings_updated'));
                 setTimeout(() => setJustSynced(false), 3000);
               }
             })
@@ -105,7 +109,7 @@ const App: React.FC = () => {
         setIsCloudEnabled(enabled);
         if (enabled && !subscription) initCloudAndRealtime();
       }
-    }, 5000);
+    }, 10000);
 
     return () => {
       clearInterval(checkInterval);
@@ -117,6 +121,7 @@ const App: React.FC = () => {
     setIsSyncing(true);
     await Store.syncLocalToCloud();
     await Store.syncSettingsFromCloud();
+    window.dispatchEvent(new Event('hb_settings_updated'));
     setTimeout(() => setIsSyncing(false), 1000);
   };
 

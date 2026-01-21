@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Store } from '../store';
 import { Settings } from '../types';
 import { 
@@ -31,6 +31,15 @@ const SettingsPage: React.FC = () => {
   });
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Listen for background sync updates from App.tsx
+  useEffect(() => {
+    const handleBackgroundSync = () => {
+      setSettings(Store.getSettings());
+    };
+    window.addEventListener('hb_settings_updated', handleBackgroundSync);
+    return () => window.removeEventListener('hb_settings_updated', handleBackgroundSync);
+  }, []);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();

@@ -65,9 +65,9 @@ const INITIAL_SETTINGS: Settings = {
   emailjsTemplateId: '',
   emailjsPublicKey: '',
   sendCopyToSelfDefault: false,
-  // ENCODED SUPABASE CREDENTIALS - Placeholders for user to fill in source
-  supabaseUrl: '', 
-  supabaseAnonKey: ''
+  // ⚠️ IMPORTANT: REPLACE THESE WITH YOUR ACTUAL KEYS FOR MULTI-DEVICE SYNC
+  supabaseUrl: 'YOUR_SUPABASE_URL', 
+  supabaseAnonKey: 'YOUR_SUPABASE_ANON_KEY'
 };
 
 export class Store {
@@ -76,7 +76,6 @@ export class Store {
   static getClient(): SupabaseClient | null {
     if (this.client) return this.client;
     const settings = this.getSettings();
-    // Validate URL format before attempting connection
     if (settings.supabaseUrl && settings.supabaseAnonKey && 
         settings.supabaseUrl.startsWith('http') && 
         settings.supabaseUrl.includes('.supabase.co')) {
@@ -93,7 +92,8 @@ export class Store {
 
   static isCloudEnabled(): boolean {
     const settings = this.getSettings();
-    return !!(settings.supabaseUrl && settings.supabaseAnonKey && settings.supabaseUrl.startsWith('http'));
+    const isPlaceholder = settings.supabaseUrl === 'YOUR_SUPABASE_URL';
+    return !!(settings.supabaseUrl && settings.supabaseAnonKey && settings.supabaseUrl.startsWith('http') && !isPlaceholder);
   }
 
   static async syncLocalToCloud() {
@@ -101,7 +101,6 @@ export class Store {
     if (!client) return;
 
     try {
-      // Short timeout check for connection
       const { count, error } = await client.from('children').select('*', { count: 'exact', head: true }).limit(1);
       if (error) throw error;
       
@@ -133,19 +132,24 @@ export class Store {
   // --- Settings ---
   static getSettings(): Settings {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    const settings = data ? JSON.parse(data) : { ...INITIAL_SETTINGS };
-    if (!settings.adminPassword) settings.adminPassword = INITIAL_SETTINGS.adminPassword;
+    const localSettings = data ? JSON.parse(data) : { ...INITIAL_SETTINGS };
     
-    // Ensure the hardcoded placeholders are used if local storage is empty
-    if (!settings.supabaseUrl && INITIAL_SETTINGS.supabaseUrl) settings.supabaseUrl = INITIAL_SETTINGS.supabaseUrl;
-    if (!settings.supabaseAnonKey && INITIAL_SETTINGS.supabaseAnonKey) settings.supabaseAnonKey = INITIAL_SETTINGS.supabaseAnonKey;
+    // Always prioritize hardcoded Supabase keys if local storage is missing them OR is just a placeholder
+    if (!localSettings.supabaseUrl || localSettings.supabaseUrl === 'YOUR_SUPABASE_URL') {
+      localSettings.supabaseUrl = INITIAL_SETTINGS.supabaseUrl;
+    }
+    if (!localSettings.supabaseAnonKey || localSettings.supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY') {
+      localSettings.supabaseAnonKey = INITIAL_SETTINGS.supabaseAnonKey;
+    }
+    if (!localSettings.adminPassword) localSettings.adminPassword = INITIAL_SETTINGS.adminPassword;
     
-    return settings;
+    return localSettings;
   }
 
   static async saveSettings(settings: Settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    this.client = null; // Reset client to force re-init with new keys
+    // Reset client in case keys changed manually in settings UI
+    this.client = null; 
     await this.syncSettingsToCloud();
   }
 
@@ -154,7 +158,9 @@ export class Store {
     if (!client) return;
     const settings = this.getSettings();
     try {
-      await client.from('app_settings').upsert({ id: 'global', data: settings });
+      // Save everything except the connection keys (they stay hardcoded or local)
+      const { supabaseUrl, supabaseAnonKey, ...syncableData } = settings;
+      await client.from('app_settings').upsert({ id: 'global', data: syncableData });
     } catch (e) {
       console.error("Failed to sync settings to cloud", e);
     }
@@ -167,15 +173,17 @@ export class Store {
       const { data, error } = await client.from('app_settings').select('data').eq('id', 'global').maybeSingle();
       if (!error && data && data.data) {
         const current = this.getSettings();
+        // Merge cloud data with our local connection keys
         const merged = { 
-          ...data.data, 
+          ...current,
+          ...data.data,
           supabaseUrl: current.supabaseUrl, 
           supabaseAnonKey: current.supabaseAnonKey 
         };
         localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(merged));
         return merged;
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Settings Cloud Sync Failed:", e); }
     return null;
   }
 
