@@ -29,7 +29,7 @@ import HolidayManagement from './pages/HolidayManagement';
 import TrendsPage from './pages/Trends';
 import Login from './pages/Login';
 
-const NavItem = ({ to, icon: Icon, label, onClick, variant = 'default' }: { to: string, icon: any, label: string, onClick?: () => void, variant?: 'default' | 'emergency' }) => {
+const NavItem = ({ to, icon: Icon, label, variant = 'default' }: { to: string, icon: any, label: string, variant?: 'default' | 'emergency' }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
   
@@ -51,7 +51,6 @@ const NavItem = ({ to, icon: Icon, label, onClick, variant = 'default' }: { to: 
   return (
     <Link 
       to={to} 
-      onClick={onClick}
       className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
         isActive ? currentStyles.active : currentStyles.inactive
       }`}
@@ -93,24 +92,19 @@ const App: React.FC = () => {
       setIsCloudEnabled(enabled);
       
       if (enabled) {
-        // Initial sync of settings
         await Store.syncSettingsFromCloud();
-        
         const client = Store.getClient();
         if (client) {
           subscription = client
-            .channel('honeybees_realtime_sync')
+            .channel('honeybees_hive_sync')
             .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
-              // Handle individual table updates for instant syncing
               if (payload.table === 'app_settings') {
                 await Store.syncSettingsFromCloud();
               } else if (payload.table === 'daily_logs') {
                 Store.handleRealtimeLogUpdate(payload.new as any);
               } else {
-                // For children, parents, etc - just notify components to refresh
                 window.dispatchEvent(new Event('hb_data_updated'));
               }
-              
               setJustSynced(true);
               setTimeout(() => setJustSynced(false), 2000);
             })
@@ -123,7 +117,6 @@ const App: React.FC = () => {
     
     setupRealtime();
 
-    // Health check interval
     const interval = setInterval(() => {
       if (Store.isCloudEnabled() && !isRealtimeConnected) {
         setupRealtime();
@@ -148,7 +141,6 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="flex min-h-screen bg-amber-50">
-        {/* Desktop Sidebar */}
         <aside className="hidden md:flex flex-col w-64 bg-white border-r border-amber-100 shadow-sm fixed h-full p-4 print:hidden z-50">
           <div className="flex items-center space-x-3 mb-10 px-4 pt-2">
             <div className="bg-amber-400 p-2 rounded-lg">
@@ -188,10 +180,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex gap-1">
                 {isCloudEnabled && (
-                  <button 
-                    onClick={handleManualSync}
-                    className={`p-2 hover:bg-amber-100 rounded-full transition-all ${isSyncing || justSynced ? 'animate-spin text-amber-600' : 'text-amber-400'}`}
-                  >
+                  <button onClick={handleManualSync} className={`p-2 hover:bg-amber-100 rounded-full transition-all ${isSyncing || justSynced ? 'animate-spin text-amber-600' : 'text-amber-400'}`}>
                     {justSynced ? <Activity size={14} className="text-green-500" /> : <RefreshCw size={14}/>}
                   </button>
                 )}
@@ -203,23 +192,16 @@ const App: React.FC = () => {
           </div>
         </aside>
 
-        {/* Mobile Header */}
         <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-amber-100 flex items-center justify-between px-6 z-[60] print:hidden">
           <div className="flex items-center gap-2">
             <img src="https://img.icons8.com/color/48/bee.png" alt="logo" className="w-7 h-7" />
             <span className="font-brand font-black text-amber-900 text-lg">Honeybees</span>
           </div>
-          <div className="flex items-center gap-3">
-             {isCloudEnabled && (
-               <div className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-400'}`} />
-             )}
-             <Link to="/settings" className="p-2 text-slate-400 hover:text-amber-600">
-               <SettingsIcon size={20} />
-             </Link>
-          </div>
+          <Link to="/settings" className="p-2 text-slate-400 hover:text-amber-600">
+            <SettingsIcon size={20} />
+          </Link>
         </header>
 
-        {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-xl border-t border-amber-100 flex items-center justify-around px-2 z-[60] shadow-[0_-4px_10px_rgba(0,0,0,0.02)] print:hidden">
           <MobileTab to="/" icon={LayoutDashboard} label="Buzz" />
           <MobileTab to="/children" icon={Baby} label="Kids" />

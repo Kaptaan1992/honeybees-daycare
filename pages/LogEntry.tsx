@@ -66,7 +66,7 @@ const LogEntry: React.FC = () => {
   useEffect(() => {
     loadData();
     
-    // Real-time listener: If another device updates this child's log, refresh local view
+    // Listen for remote updates to this specific log
     const handleLogSync = (e: any) => {
       const remoteLog = e.detail as DailyLog;
       if (remoteLog.childId === childId && remoteLog.date === currentDate) {
@@ -130,7 +130,7 @@ const LogEntry: React.FC = () => {
   if (isLoading) return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-amber-900/40">
        <Loader2 className="animate-spin mb-4" size={32} />
-       <p className="font-bold uppercase tracking-widest text-[10px]">Loading Child Log...</p>
+       <p className="font-bold uppercase tracking-widest text-[10px]">Syncing Log...</p>
     </div>
   );
 

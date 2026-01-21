@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Store } from '../store';
 import { Child, Parent, Language } from '../types';
-import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Languages, Edit3, X, Loader2, Pill } from 'lucide-react';
+import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Edit3, X, Loader2, Pill } from 'lucide-react';
 
 const ChildrenManagement: React.FC = () => {
   const [children, setChildren] = useState<Child[]>([]);
@@ -11,23 +11,26 @@ const ChildrenManagement: React.FC = () => {
   const [isAddingChild, setIsAddingChild] = useState(false);
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   
-  // Parent Modal State
   const [parentModal, setParentModal] = useState<{ isOpen: boolean; childId: string | null; editingParent: Parent | null }>({
     isOpen: false,
     childId: null,
     editingParent: null
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (showLoader = false) => {
+    if (showLoader) setIsLoading(true);
     setChildren(await Store.getChildren());
     setParents(await Store.getParents());
     setIsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData(true);
+    
+    const handleSync = () => loadData(false);
+    window.addEventListener('hb_data_updated', handleSync);
+    return () => window.removeEventListener('hb_data_updated', handleSync);
+  }, [loadData]);
 
   const saveChild = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -60,9 +63,9 @@ const ChildrenManagement: React.FC = () => {
   };
 
   const handleDeleteChild = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete ${name}? This will remove them from the system, but their past reports will remain in History.`)) {
+    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
       await Store.deleteChild(id);
-      await loadData();
+      loadData(false);
     }
   };
 
@@ -107,10 +110,7 @@ const ChildrenManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-brand font-extrabold text-amber-900">Manage Children</h1>
-        <button 
-          onClick={() => setIsAddingChild(true)}
-          className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-sm"
-        >
+        <button onClick={() => setIsAddingChild(true)} className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-sm">
           <Plus size={20} />
           <span>Add Child</span>
         </button>
@@ -136,44 +136,24 @@ const ChildrenManagement: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <button 
-                    onClick={() => setEditingChild(child)} 
-                    className="p-2 text-slate-300 hover:text-amber-500 transition-colors"
-                    title="Edit Child"
-                  >
-                    <Edit2 size={18} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteChild(child.id, child.firstName)} 
-                    className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                    title="Delete Child"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  <button onClick={() => setEditingChild(child)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit2 size={18} /></button>
+                  <button onClick={() => handleDeleteChild(child.id, child.firstName)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
                 </div>
               </div>
-
               <div className="flex-1 space-y-3">
                 {child.dailyMedications && child.dailyMedications.length > 0 && (
                   <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100">
-                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Pill size={12} /> Daily Meds
-                    </p>
+                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Pill size={12} /> Daily Meds</p>
                     <p className="text-xs text-indigo-700 font-medium">{child.dailyMedications.join(', ')}</p>
                   </div>
                 )}
-
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-400 uppercase">Parents / Guardians</p>
-                  <button 
-                    onClick={() => setParentModal({ isOpen: true, childId: child.id, editingParent: null })} 
-                    className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"
-                  >
+                  <button onClick={() => setParentModal({ isOpen: true, childId: child.id, editingParent: null })} className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1">
                     <UserPlus size={12} />
                     <span>Link Parent</span>
                   </button>
                 </div>
-                
                 <div className="space-y-2">
                   {child.parentIds.map(pid => {
                     const parent = parents.find(p => p.id === pid);
@@ -185,32 +165,12 @@ const ChildrenManagement: React.FC = () => {
                             <p className="text-sm font-bold text-slate-700 truncate">{parent.fullName}</p>
                             <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded uppercase">{parent.relationship}</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${parent.receivesEmail ? 'bg-green-400' : 'bg-slate-300'}`} title={parent.receivesEmail ? 'Receives Emails' : 'Email notifications off'} />
-                            <button 
-                              onClick={() => setParentModal({ isOpen: true, childId: child.id, editingParent: parent })}
-                              className="p-1 text-slate-300 hover:text-amber-500 transition-colors"
-                            >
-                              <Edit3 size={14} />
-                            </button>
-                          </div>
+                          <button onClick={() => setParentModal({ isOpen: true, childId: child.id, editingParent: parent })} className="p-1 text-slate-300 hover:text-amber-500"><Edit3 size={14} /></button>
                         </div>
-                        <div className="mt-1 space-y-0.5">
-                          <p className="text-xs text-slate-400 flex items-center gap-1 truncate">
-                            <Mail size={10} /> {parent.email}
-                          </p>
-                          {parent.phone && (
-                            <p className="text-xs text-slate-400 flex items-center gap-1">
-                              <Phone size={10} /> {parent.phone}
-                            </p>
-                          )}
-                        </div>
+                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-1 truncate"><Mail size={10} /> {parent.email}</p>
                       </div>
                     );
                   })}
-                  {child.parentIds.length === 0 && (
-                    <p className="text-xs italic text-slate-400 text-center py-2 bg-slate-50 rounded-xl">No parents linked</p>
-                  )}
                 </div>
               </div>
             </div>
@@ -218,7 +178,6 @@ const ChildrenManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Child Form Modal */}
       {(isAddingChild || editingChild) && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <form onSubmit={saveChild} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -226,101 +185,39 @@ const ChildrenManagement: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">First Name</label>
-                <input name="firstName" defaultValue={editingChild?.firstName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
+                <input name="firstName" defaultValue={editingChild?.firstName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none" />
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Last Name</label>
-                <input name="lastName" defaultValue={editingChild?.lastName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Date of Birth</label>
-                <input name="dob" type="date" defaultValue={editingChild?.dob} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Classroom/Group</label>
-                <select name="classroom" defaultValue={editingChild?.classroom || 'Toddlers'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-sm">
-                  <option value="Infants">Infants</option>
-                  <option value="Toddlers">Toddlers</option>
-                  <option value="Pre school">Pre school</option>
-                </select>
+                <input name="lastName" defaultValue={editingChild?.lastName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none" />
               </div>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Daily Medications (Optional)</label>
-              <textarea 
-                name="dailyMedications" 
-                placeholder="Tylenol, Advil, Allergy drops (comma separated)"
-                defaultValue={editingChild?.dailyMedications?.join(', ')} 
-                className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 h-20 text-sm" 
-              />
+              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Daily Medications</label>
+              <textarea name="dailyMedications" placeholder="Tylenol, Advil..." defaultValue={editingChild?.dailyMedications?.join(', ')} className="w-full px-4 py-2 bg-slate-50 rounded-xl h-20 text-sm" />
             </div>
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Allergies</label>
-              <textarea name="allergies" defaultValue={editingChild?.allergies} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 h-20 text-sm" />
+              <textarea name="allergies" defaultValue={editingChild?.allergies} className="w-full px-4 py-2 bg-slate-50 rounded-xl h-20 text-sm" />
             </div>
             <div className="flex gap-4 pt-4">
-              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3 rounded-2xl shadow-lg shadow-amber-100">Save Child</button>
+              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3 rounded-2xl">Save Child</button>
               <button type="button" onClick={() => { setIsAddingChild(false); setEditingChild(null); }} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-2xl">Cancel</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Parent Form Modal */}
       {parentModal.isOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <form onSubmit={handleParentSave} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-800">{parentModal.editingParent ? 'Edit' : 'Add'} Parent Contact</h2>
-              <button type="button" onClick={() => setParentModal({ isOpen: false, childId: null, editingParent: null })} className="text-slate-400"><X /></button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Full Name</label>
-                <input name="fullName" defaultValue={parentModal.editingParent?.fullName} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Phone Number</label>
-                <input name="phone" type="tel" placeholder="(555) 000-0000" defaultValue={parentModal.editingParent?.phone} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Email Address</label>
-              <input name="email" type="email" defaultValue={parentModal.editingParent?.email} required className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Relationship</label>
-                <select name="relationship" defaultValue={parentModal.editingParent?.relationship || 'Mom'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-sm">
-                  <option value="Mom">Mom</option>
-                  <option value="Dad">Dad</option>
-                  <option value="Guardian">Guardian</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Language</label>
-                <select name="preferredLanguage" defaultValue={parentModal.editingParent?.preferredLanguage || 'English'} className="w-full px-4 py-2 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-sm">
-                  <option value="English">English</option>
-                  <option value="Urdu">Urdu</option>
-                  <option value="Punjabi">Punjabi</option>
-                </select>
-              </div>
-            </div>
-
-            <label className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl cursor-pointer">
-              <input name="receivesEmail" type="checkbox" defaultChecked={parentModal.editingParent?.receivesEmail ?? true} className="w-5 h-5 accent-amber-600" />
-              <span className="text-sm font-bold text-amber-900">Receives daily report emails</span>
-            </label>
-
+            <h2 className="text-xl font-bold text-slate-800 mb-4">{parentModal.editingParent ? 'Edit' : 'Add'} Parent Contact</h2>
+            <input name="fullName" defaultValue={parentModal.editingParent?.fullName} required placeholder="Full Name" className="w-full px-4 py-2 bg-slate-50 rounded-xl" />
+            <input name="email" type="email" defaultValue={parentModal.editingParent?.email} required placeholder="Email" className="w-full px-4 py-2 bg-slate-50 rounded-xl" />
+            <input name="phone" defaultValue={parentModal.editingParent?.phone} placeholder="Phone" className="w-full px-4 py-2 bg-slate-50 rounded-xl" />
             <div className="flex gap-4 pt-4">
-              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3 rounded-2xl shadow-lg shadow-amber-100">
-                {parentModal.editingParent ? 'Update Contact' : 'Link Parent'}
-              </button>
+              <button type="submit" className="flex-1 bg-amber-600 text-white font-bold py-3 rounded-2xl">Save Parent</button>
+              <button type="button" onClick={() => setParentModal({ isOpen: false, childId: null, editingParent: null })} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-2xl">Cancel</button>
             </div>
           </form>
         </div>

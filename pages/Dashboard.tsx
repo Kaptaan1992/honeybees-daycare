@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store } from '../store';
 import { Child, DailyLog } from '../types';
@@ -14,12 +14,12 @@ import {
   UserCheck,
   UserX,
   Baby,
-  Smile,
   GraduationCap,
   ShieldAlert,
   CheckCircle2,
   RefreshCw,
-  LogOut
+  LogOut,
+  Smile
 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -50,7 +50,7 @@ const Dashboard: React.FC = () => {
       
       setLogs(todayLogs);
     } catch (e) {
-      console.error("Dashboard Sync Error:", e);
+      console.error("Dashboard Load Error:", e);
     } finally {
       setIsLoading(false);
       setIsSyncing(false);
@@ -60,10 +60,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     loadData(true);
     
-    // Listen for generic data updates
     const handleDataUpdate = () => loadData(false);
-    
-    // Listen for specific real-time log pushes from other devices
     const handleRealtimeLog = (e: any) => {
       const remoteLog = e.detail as DailyLog;
       if (remoteLog.date === currentDate) {
@@ -181,10 +178,7 @@ const Dashboard: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => navigate('/emergency')}
-            className="flex items-center gap-2 bg-red-600 text-white font-black px-4 py-2.5 rounded-xl shadow-lg shadow-red-100"
-          >
+          <button onClick={() => navigate('/emergency')} className="flex items-center gap-2 bg-red-600 text-white font-black px-4 py-2.5 rounded-xl shadow-lg shadow-red-100">
             <ShieldAlert size={18} />
             <span className="text-xs uppercase">Emergency</span>
           </button>

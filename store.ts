@@ -22,9 +22,28 @@ const INITIAL_SETTINGS: Settings = {
   emailjsTemplateId: '',
   emailjsPublicKey: '',
   sendCopyToSelfDefault: false,
-  supabaseUrl: 'YOUR_SUPABASE_URL', 
-  supabaseAnonKey: 'YOUR_SUPABASE_ANON_KEY'
+  supabaseUrl: '', 
+  supabaseAnonKey: ''
 };
+
+const SEED_HOLIDAYS: Holiday[] = [
+  { id: 'h1', name: 'Martin Luther King Jr. Day', date: '2026-01-19', type: 'Closed' },
+  { id: 'h2', name: "Presidents' Day", date: '2026-02-16', type: 'Closed' },
+  { id: 'h3', name: 'Eid al-Fitr (Tentative)', date: '2026-03-20', type: 'Closed', notes: 'Tentative - moon sighting' },
+  { id: 'h4', name: 'Memorial Day', date: '2026-05-25', type: 'Closed' },
+  { id: 'h5', name: 'Eid al-Adha (Tentative)', date: '2026-05-27', type: 'Closed', notes: 'Tentative - moon sighting' },
+  { id: 'h6', name: 'Juneteenth', date: '2026-06-19', type: 'Closed' },
+  { id: 'h7', name: 'Independence Day (Observed)', date: '2026-07-03', type: 'Closed' },
+  { id: 'h8', name: 'Labor Day', date: '2026-09-07', type: 'Closed' },
+  { id: 'h9', name: "Columbus Day / Indigenous Peoples' Day", date: '2026-10-12', type: 'Closed' },
+  { id: 'h10', name: 'Veterans Day', date: '2026-11-11', type: 'Closed' },
+  { id: 'h11', name: 'Thanksgiving Break', date: '2026-11-26', type: 'Closed' },
+  { id: 'h12', name: 'Thanksgiving Break', date: '2026-11-27', type: 'Closed' },
+  { id: 'h13', name: 'Christmas Break', date: '2026-12-24', type: 'Closed' },
+  { id: 'h14', name: 'Christmas Break', date: '2026-12-25', type: 'Closed' },
+  { id: 'h15', name: "New Year's Eve", date: '2026-12-31', type: 'Half Day' },
+  { id: 'h16', name: "New Year's Day", date: '2027-01-01', type: 'Closed' },
+];
 
 export class Store {
   private static client: SupabaseClient | null = null;
@@ -32,8 +51,7 @@ export class Store {
   static getClient(): SupabaseClient | null {
     if (this.client) return this.client;
     const settings = this.getSettings();
-    const isPlaceholder = settings.supabaseUrl === 'YOUR_SUPABASE_URL';
-    if (!isPlaceholder && settings.supabaseUrl && settings.supabaseAnonKey) {
+    if (settings.supabaseUrl && settings.supabaseAnonKey) {
       try {
         this.client = createClient(settings.supabaseUrl, settings.supabaseAnonKey);
         return this.client;
@@ -47,14 +65,12 @@ export class Store {
 
   static isCloudEnabled(): boolean {
     const settings = this.getSettings();
-    const isPlaceholder = settings.supabaseUrl === 'YOUR_SUPABASE_URL';
-    return !!(settings.supabaseUrl && settings.supabaseAnonKey && settings.supabaseUrl.startsWith('http') && !isPlaceholder);
+    return !!(settings.supabaseUrl && settings.supabaseAnonKey && settings.supabaseUrl.startsWith('http'));
   }
 
   static getSettings(): Settings {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     const localSettings = data ? JSON.parse(data) : { ...INITIAL_SETTINGS };
-    // Ensure we don't return placeholder values to the logic
     if (localSettings.supabaseUrl === 'YOUR_SUPABASE_URL') localSettings.supabaseUrl = '';
     if (localSettings.supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY') localSettings.supabaseAnonKey = '';
     return localSettings;
@@ -104,20 +120,18 @@ export class Store {
       if (parents.length > 0) await client.from('parents').upsert(parents);
       const logs = this.getDailyLogsLocal();
       if (logs.length > 0) await client.from('daily_logs').upsert(logs);
-      const holidays = this.getHolidaysLocal();
+      const holidays = await this.getHolidays();
       if (holidays.length > 0) await client.from('holidays').upsert(holidays);
       await this.syncSettingsToCloud();
     } catch (e) { console.error("Full Sync Error:", e); }
   }
 
-  // --- Logs Logic ---
   private static getDailyLogsLocal(): DailyLog[] {
     const data = localStorage.getItem(STORAGE_KEYS.DAILY_LOGS);
     return data ? JSON.parse(data) : [];
   }
 
   static async getDailyLogs(): Promise<DailyLog[]> {
-    const local = this.getDailyLogsLocal();
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('daily_logs').select('*');
@@ -126,7 +140,7 @@ export class Store {
         return data as DailyLog[];
       }
     }
-    return local;
+    return this.getDailyLogsLocal();
   }
 
   static async saveDailyLog(log: DailyLog) {
@@ -186,13 +200,12 @@ export class Store {
     window.dispatchEvent(new CustomEvent('hb_log_synced', { detail: remoteLog }));
   }
 
-  // --- Standard Data Accessors ---
   private static getChildrenLocal(): Child[] {
     const data = localStorage.getItem(STORAGE_KEYS.CHILDREN);
     return data ? JSON.parse(data) : [];
   }
+
   static async getChildren(): Promise<Child[]> {
-    const local = this.getChildrenLocal();
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('children').select('*');
@@ -201,13 +214,15 @@ export class Store {
         return data as Child[];
       }
     }
-    return local;
+    return this.getChildrenLocal();
   }
+
   static async saveChildren(children: Child[]) {
     localStorage.setItem(STORAGE_KEYS.CHILDREN, JSON.stringify(children));
     const client = this.getClient();
     if (client) await client.from('children').upsert(children);
   }
+
   static async deleteChild(id: string) {
     const children = (await this.getChildren()).filter(c => c.id !== id);
     await this.saveChildren(children);
@@ -219,8 +234,8 @@ export class Store {
     const data = localStorage.getItem(STORAGE_KEYS.PARENTS);
     return data ? JSON.parse(data) : [];
   }
+
   static async getParents(): Promise<Parent[]> {
-    const local = this.getParentsLocal();
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('parents').select('*');
@@ -229,8 +244,9 @@ export class Store {
         return data as Parent[];
       }
     }
-    return local;
+    return this.getParentsLocal();
   }
+
   static async saveParents(parents: Parent[]) {
     localStorage.setItem(STORAGE_KEYS.PARENTS, JSON.stringify(parents));
     const client = this.getClient();
@@ -239,25 +255,32 @@ export class Store {
 
   private static getHolidaysLocal(): Holiday[] {
     const local = localStorage.getItem(STORAGE_KEYS.HOLIDAYS);
-    return local ? JSON.parse(local) : [];
+    const holidays = local ? JSON.parse(local) : [];
+    if (holidays.length === 0) {
+      localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(SEED_HOLIDAYS));
+      return SEED_HOLIDAYS;
+    }
+    return holidays;
   }
+
   static async getHolidays(): Promise<Holiday[]> {
-    const local = this.getHolidaysLocal();
     const client = this.getClient();
     if (client) {
       const { data, error } = await client.from('holidays').select('*');
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(data));
         return data as Holiday[];
       }
     }
-    return local;
+    return this.getHolidaysLocal();
   }
+
   static async saveHolidays(holidays: Holiday[]) {
     localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidays));
     const client = this.getClient();
     if (client) await client.from('holidays').upsert(holidays);
   }
+
   static async deleteHoliday(id: string) {
     const holidays = (await this.getHolidays()).filter(h => h.id !== id);
     await this.saveHolidays(holidays);

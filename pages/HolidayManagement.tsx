@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Store } from '../store';
 import { Holiday } from '../types';
 import { Plus, Trash2, Edit2, Calendar, Loader2, X, Check, AlertCircle } from 'lucide-react';
@@ -16,16 +16,21 @@ const HolidayManagement: React.FC = () => {
     type: 'Closed'
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (showLoader = false) => {
+    if (showLoader) setIsLoading(true);
     const data = await Store.getHolidays();
     setHolidays(data.sort((a, b) => a.date.localeCompare(b.date)));
     setIsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData(true);
+    
+    // Listen for real-time cloud updates
+    const handleSync = () => loadData(false);
+    window.addEventListener('hb_data_updated', handleSync);
+    return () => window.removeEventListener('hb_data_updated', handleSync);
+  }, [loadData]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +57,7 @@ const HolidayManagement: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this closure date? Parents will no longer see notifications for it.')) {
       await Store.deleteHoliday(id);
-      loadData();
+      loadData(false);
     }
   };
 
@@ -110,6 +115,12 @@ const HolidayManagement: React.FC = () => {
             </div>
           </div>
         ))}
+        {holidays.length === 0 && (
+          <div className="col-span-full py-12 text-center bg-white border-2 border-dashed border-amber-100 rounded-3xl text-slate-400">
+            <Calendar size={40} className="mx-auto mb-3 opacity-20" />
+            <p className="font-bold">No upcoming closures scheduled.</p>
+          </div>
+        )}
       </div>
 
       {isAdding && (
