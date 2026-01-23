@@ -71,8 +71,8 @@ const MobileTab = ({ to, icon: Icon, label }: { to: string, icon: any, label: st
         isActive ? 'text-amber-600 scale-110' : 'text-slate-400'
       }`}
     >
-      <Icon size={22} className={isActive ? 'fill-amber-50' : ''} />
-      <span className={`text-[10px] font-bold mt-1 ${isActive ? 'text-amber-700' : 'text-slate-400'}`}>{label}</span>
+      <Icon size={20} className={isActive ? 'fill-amber-50' : ''} />
+      <span className={`text-[9px] font-bold mt-1 leading-none text-center px-1 ${isActive ? 'text-amber-700' : 'text-slate-400'}`}>{label}</span>
     </Link>
   );
 };
@@ -141,6 +141,7 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="flex min-h-screen bg-amber-50">
+        {/* Desktop Sidebar */}
         <aside className="hidden md:flex flex-col w-64 bg-white border-r border-amber-100 shadow-sm fixed h-full p-4 print:hidden z-50">
           <div className="flex items-center space-x-3 mb-10 px-4 pt-2">
             <div className="bg-amber-400 p-2 rounded-lg">
@@ -192,19 +193,27 @@ const App: React.FC = () => {
           </div>
         </aside>
 
+        {/* Mobile Header */}
         <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-amber-100 flex items-center justify-between px-6 z-[60] print:hidden">
           <div className="flex items-center gap-2">
             <img src="https://img.icons8.com/color/48/bee.png" alt="logo" className="w-7 h-7" />
             <span className="font-brand font-black text-amber-900 text-lg">Honeybees</span>
           </div>
-          <Link to="/settings" className="p-2 text-slate-400 hover:text-amber-600">
-            <SettingsIcon size={20} />
-          </Link>
+          <div className="flex gap-2">
+            <Link to="/closures" className="p-2 text-slate-400 hover:text-amber-600">
+              <Calendar size={20} />
+            </Link>
+            <Link to="/settings" className="p-2 text-slate-400 hover:text-amber-600">
+              <SettingsIcon size={20} />
+            </Link>
+          </div>
         </header>
 
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-xl border-t border-amber-100 flex items-center justify-around px-2 z-[60] shadow-[0_-4px_10px_rgba(0,0,0,0.02)] print:hidden">
+        {/* Expanded Mobile Bottom Navigation */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-xl border-t border-amber-100 flex items-center justify-around px-1 z-[60] shadow-[0_-4px_10px_rgba(0,0,0,0.02)] print:hidden">
           <MobileTab to="/" icon={LayoutDashboard} label="Buzz" />
           <MobileTab to="/children" icon={Baby} label="Kids" />
+          <MobileTab to="/history" icon={History} label="History" />
           <MobileTab to="/attendance" icon={CalendarCheck} label="Attendance" />
           <MobileTab to="/trends" icon={LineChart} label="Trends" />
           <MobileTab to="/emergency" icon={ShieldAlert} label="SOS" />

@@ -147,8 +147,10 @@ const ReportPreview: React.FC = () => {
     }
 
     if (success && !isTest) {
-      // 1. Update log status
-      await Store.saveDailyLog({ ...log!, status: 'Sent' });
+      // 1. Update log status to "Sent"
+      const updatedLog: DailyLog = { ...log!, status: 'Sent' };
+      await Store.saveDailyLog(updatedLog);
+      setLog(updatedLog);
       
       // 2. Save a send log record for history tracking
       const sendLogRecord: EmailSendLog = {
@@ -160,6 +162,9 @@ const ReportPreview: React.FC = () => {
         status: 'Sent'
       };
       await Store.saveSendLog(sendLogRecord);
+      
+      // 3. BROADCAST SYNC: This is crucial for fixing the "Still Draft" issue in History
+      window.dispatchEvent(new Event('hb_data_updated'));
       
       setIsSentSuccessfully(true);
     }
