@@ -21,7 +21,8 @@ import {
   Send,
   Loader2,
   Copy,
-  LineChart
+  LineChart,
+  AlertCircle
 } from 'lucide-react';
 
 const ReportPreview: React.FC = () => {
@@ -101,13 +102,15 @@ const ReportPreview: React.FC = () => {
   const emailContentText = log && child ? generateEmailBody(log, child, settings, aiSummary, holidays) : '';
   const emailContentHtml = log && child ? generateHtmlEmailBody(log, child, settings, aiSummary, holidays, allLogs) : '';
 
+  const activeRecipients = parents.filter(p => p.receivesEmail);
+
   const handleSendEmail = async (isTest = false) => {
-    let recipients = isTest ? [settings.testEmail || settings.fromEmail] : parents.filter(p => p.receivesEmail).map(p => p.email);
+    let recipients = isTest ? [settings.testEmail || settings.fromEmail] : activeRecipients.map(p => p.email);
     if (!isTest && sendCopyToSelf && settings.fromEmail) recipients.push(settings.fromEmail);
     recipients = Array.from(new Set(recipients)).filter(Boolean);
 
     if (recipients.length === 0) {
-      alert("No recipients!");
+      alert("No recipients! Go to Children management to link parents or enable 'Receive Reports' for them.");
       return;
     }
 
@@ -147,12 +150,10 @@ const ReportPreview: React.FC = () => {
     }
 
     if (success && !isTest) {
-      // 1. Update log status to "Sent"
       const updatedLog: DailyLog = { ...log!, status: 'Sent' };
       await Store.saveDailyLog(updatedLog);
       setLog(updatedLog);
       
-      // 2. Save a send log record for history tracking
       const sendLogRecord: EmailSendLog = {
         id: Math.random().toString(36).substr(2, 9),
         dailyLogId: log!.id,
@@ -163,9 +164,7 @@ const ReportPreview: React.FC = () => {
       };
       await Store.saveSendLog(sendLogRecord);
       
-      // 3. BROADCAST SYNC: This is crucial for fixing the "Still Draft" issue in History
       window.dispatchEvent(new Event('hb_data_updated'));
-      
       setIsSentSuccessfully(true);
     }
     
@@ -176,7 +175,7 @@ const ReportPreview: React.FC = () => {
   if (error) return <div className="p-20 text-center">{error}</div>;
 
   return (
-    <div className="space-y-6 pb-40">
+    <div className="space-y-6 pb-60">
       <div className="flex items-center justify-between">
         <button onClick={() => navigate(`/log/${childId}`)} className="p-2 text-slate-400 hover:text-amber-600"><ArrowLeft /></button>
         <h1 className="text-2xl font-brand font-extrabold text-amber-900">Review Report</h1>
@@ -212,15 +211,28 @@ const ReportPreview: React.FC = () => {
                 />
               </label>
 
-              {parents.map(p => (
-                <div key={p.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl">
-                  <div>
-                    <p className="text-sm font-bold text-slate-700">{p.fullName}</p>
-                    <p className="text-xs text-slate-400">{p.email}</p>
-                  </div>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${p.receivesEmail ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-400'}`}><Mail size={16} /></div>
+              <div className="p-4 bg-slate-50 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                   <p className="text-xs font-bold text-slate-400 uppercase">Recipients</p>
+                   {activeRecipients.length === 0 && (
+                     <div className="flex items-center gap-1 text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full uppercase">
+                       <AlertCircle size={10}/> No Recipients Active
+                     </div>
+                   )}
                 </div>
-              ))}
+                {parents.map(p => (
+                  <div key={p.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-100">
+                    <div>
+                      <p className="text-sm font-bold text-slate-700">{p.fullName}</p>
+                      <p className="text-xs text-slate-400">{p.email}</p>
+                    </div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${p.receivesEmail ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-300'}`} title={p.receivesEmail ? 'Active recipient' : 'Email disabled'}>
+                      <Mail size={16} />
+                    </div>
+                  </div>
+                ))}
+                {parents.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">No parents linked to this child profile.</p>}
+              </div>
             </div>
           </section>
 
@@ -236,7 +248,7 @@ const ReportPreview: React.FC = () => {
             </div>
           </section>
 
-          <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-white/80 backdrop-blur-md border-t border-amber-100 flex flex-col items-center gap-4">
+          <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 pb-10 bg-white/90 backdrop-blur-md border-t border-amber-100 flex flex-col items-center gap-4 z-[70] shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
             <label className="w-full max-w-2xl flex items-center justify-between p-3 bg-amber-50 rounded-2xl border border-amber-100 cursor-pointer">
               <div className="flex items-center gap-3">
                 <Copy size={16} className="text-amber-600" />
@@ -244,7 +256,11 @@ const ReportPreview: React.FC = () => {
               </div>
               <input type="checkbox" checked={sendCopyToSelf} onChange={e => setSendCopyToSelf(e.target.checked)} />
             </label>
-            <button onClick={() => handleSendEmail(false)} disabled={isSending} className="w-full max-w-2xl flex items-center justify-center gap-3 bg-amber-600 text-white font-extrabold py-5 rounded-3xl shadow-xl shadow-amber-200 disabled:opacity-50">
+            <button 
+              onClick={() => handleSendEmail(false)} 
+              disabled={isSending || (activeRecipients.length === 0 && !sendCopyToSelf)} 
+              className="w-full max-w-2xl flex items-center justify-center gap-3 bg-amber-600 text-white font-extrabold py-5 rounded-3xl shadow-xl shadow-amber-200 disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none transition-all transform active:scale-95"
+            >
               {isSending ? <Loader2 className="animate-spin" /> : <Send size={20} />} Confirm & Send Report Now
             </button>
           </div>

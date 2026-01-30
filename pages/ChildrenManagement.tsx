@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Store } from '../store';
 import { Child, Parent, Language } from '../types';
-import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Edit3, X, Loader2, Pill, Calendar } from 'lucide-react';
+import { Plus, UserPlus, Trash2, Edit2, Baby, Mail, Phone, Edit3, X, Loader2, Pill, Calendar, Check } from 'lucide-react';
 
 const ChildrenManagement: React.FC = () => {
   const [children, setChildren] = useState<Child[]>([]);
@@ -171,7 +171,10 @@ const ChildrenManagement: React.FC = () => {
                           </div>
                           <button onClick={() => setParentModal({ isOpen: true, childId: child.id, editingParent: parent })} className="p-1 text-slate-300 hover:text-amber-500"><Edit3 size={14} /></button>
                         </div>
-                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-1 truncate"><Mail size={10} /> {parent.email}</p>
+                        <div className="flex items-center justify-between mt-1">
+                           <p className="text-xs text-slate-400 flex items-center gap-1 truncate"><Mail size={10} /> {parent.email}</p>
+                           {parent.receivesEmail && <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 rounded-full uppercase">Email Active</span>}
+                        </div>
                       </div>
                     );
                   })}
@@ -248,7 +251,7 @@ const ChildrenManagement: React.FC = () => {
 
       {parentModal.isOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <form onSubmit={handleParentSave} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4 animate-in zoom-in duration-300">
+          <form onSubmit={handleParentSave} className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl space-y-4 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-slate-800 mb-4">{parentModal.editingParent ? 'Edit' : 'Add'} Parent Contact</h2>
             <input name="fullName" defaultValue={parentModal.editingParent?.fullName} required placeholder="Full Name" className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
             <input name="email" type="email" defaultValue={parentModal.editingParent?.email} required placeholder="Email Address" className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-400" />
@@ -271,6 +274,22 @@ const ChildrenManagement: React.FC = () => {
                   <option value="Punjabi">Punjabi</option>
                 </select>
               </div>
+            </div>
+
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                 <div className="bg-white p-2 rounded-xl text-amber-600 shadow-sm"><Mail size={16} /></div>
+                 <div>
+                    <p className="text-sm font-bold text-slate-700">Receive Reports</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Email Daily Summaries</p>
+                 </div>
+              </div>
+              <input 
+                name="receivesEmail" 
+                type="checkbox" 
+                defaultChecked={parentModal.editingParent ? parentModal.editingParent.receivesEmail : true} 
+                className="w-6 h-6 accent-amber-600"
+              />
             </div>
 
             <div className="flex gap-4 pt-4">
