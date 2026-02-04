@@ -40,9 +40,9 @@ const TrendsPage: React.FC = () => {
     const now = new Date();
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now);
-      d.setDate(now.getDate() - i);
+      d.setDate(now.getDate() - (6 - i)); // Go from 6 days ago to today
       return d.toISOString().split('T')[0];
-    }).reverse();
+    });
 
     const data = last7Days.map(date => {
       const log = logs.find(l => l.childId === selectedChildId && l.date === date);
@@ -74,9 +74,10 @@ const TrendsPage: React.FC = () => {
       };
     });
 
-    const daysWithData = data.filter(d => d.hasData).length || 1;
-    const avgMilk = data.filter(d => d.hasData).reduce((a, b) => a + b.milk, 0) / daysWithData;
-    const avgNap = data.filter(d => d.hasData).reduce((a, b) => a + b.nap, 0) / daysWithData;
+    const logsWithData = data.filter(d => d.hasData);
+    const count = logsWithData.length || 1;
+    const avgMilk = logsWithData.reduce((a, b) => a + b.milk, 0) / count;
+    const avgNap = logsWithData.reduce((a, b) => a + b.nap, 0) / count;
 
     return { data, avgMilk, avgNap };
   }, [selectedChildId, logs]);
@@ -126,35 +127,36 @@ const TrendsPage: React.FC = () => {
               <h3 className="font-extrabold text-slate-800">Milk Intake (oz)</h3>
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">Daily Avg (7 Days)</p>
+              <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest leading-none mb-1">7-Day Avg</p>
               <p className="text-lg font-black text-blue-700">{childTrends?.avgMilk.toFixed(1)} oz</p>
             </div>
           </div>
           <div className="p-6">
-            <div className="flex items-end justify-between h-40 gap-1 mb-4">
+            <div className="flex items-end justify-between h-48 gap-2 mb-4 px-2">
               {childTrends?.data.map((d, i) => {
-                const height = d.hasData ? Math.max((d.milk / 40) * 100, 5) : 2;
+                const maxVal = Math.max(...childTrends.data.map(x => x.milk), 40);
+                const heightPercent = d.hasData ? Math.max((d.milk / maxVal) * 100, 4) : 0;
                 return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div className="w-full relative flex items-end justify-center h-full">
-                      {d.hasData && (
-                        <div className="absolute -top-6 bg-blue-600 text-white text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full">
+                    <div className="w-full relative flex flex-col items-center justify-end h-full">
+                      {d.hasData && d.milk > 0 && (
+                        <div className="absolute -top-6 bg-slate-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">
                           {d.milk} oz
                         </div>
                       )}
                       <div 
-                        className={`w-full max-w-[24px] rounded-t-lg transition-all ${
-                          d.hasData ? 'bg-blue-400 hover:bg-blue-500' : 'bg-slate-100'
+                        className={`w-6 sm:w-8 rounded-t-lg transition-all duration-500 ${
+                          d.hasData ? (d.milk > 0 ? 'bg-blue-400 group-hover:bg-blue-500' : 'bg-blue-100') : 'bg-slate-50'
                         }`}
-                        style={{ height: `${height}%` }}
+                        style={{ height: `${heightPercent}%` }}
                       ></div>
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">{d.shortDate}</span>
+                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase">{d.shortDate}</span>
                   </div>
                 );
               })}
             </div>
-            <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-wide">Daily consumption totals</p>
+            <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-widest mt-2">Daily consumption totals</p>
           </div>
         </div>
 
@@ -168,35 +170,36 @@ const TrendsPage: React.FC = () => {
               <h3 className="font-extrabold text-slate-800">Nap Duration (min)</h3>
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-purple-400 font-bold uppercase tracking-widest">Daily Avg (7 Days)</p>
+              <p className="text-[10px] text-purple-400 font-bold uppercase tracking-widest leading-none mb-1">7-Day Avg</p>
               <p className="text-lg font-black text-purple-700">{Math.floor(childTrends?.avgNap || 0)} min</p>
             </div>
           </div>
           <div className="p-6">
-            <div className="flex items-end justify-between h-40 gap-1 mb-4">
+            <div className="flex items-end justify-between h-48 gap-2 mb-4 px-2">
               {childTrends?.data.map((d, i) => {
-                const height = d.hasData ? Math.max((d.nap / 240) * 100, 5) : 2;
+                const maxVal = Math.max(...childTrends.data.map(x => x.nap), 240);
+                const heightPercent = d.hasData ? Math.max((d.nap / maxVal) * 100, 4) : 0;
                 return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div className="w-full relative flex items-end justify-center h-full">
-                      {d.hasData && (
-                        <div className="absolute -top-6 bg-purple-600 text-white text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full">
+                    <div className="w-full relative flex flex-col items-center justify-end h-full">
+                      {d.hasData && d.nap > 0 && (
+                        <div className="absolute -top-6 bg-slate-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">
                           {d.nap}m
                         </div>
                       )}
                       <div 
-                        className={`w-full max-w-[24px] rounded-t-lg transition-all ${
-                          d.hasData ? 'bg-purple-400 hover:bg-purple-500' : 'bg-slate-100'
+                        className={`w-6 sm:w-8 rounded-t-lg transition-all duration-500 ${
+                          d.hasData ? (d.nap > 0 ? 'bg-purple-400 group-hover:bg-purple-500' : 'bg-purple-100') : 'bg-slate-50'
                         }`}
-                        style={{ height: `${height}%` }}
+                        style={{ height: `${heightPercent}%` }}
                       ></div>
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">{d.shortDate}</span>
+                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase">{d.shortDate}</span>
                   </div>
                 );
               })}
             </div>
-            <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-wide">Total sleep time per day</p>
+            <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-widest mt-2">Total sleep time per day</p>
           </div>
         </div>
       </div>
@@ -206,10 +209,9 @@ const TrendsPage: React.FC = () => {
           <TrendingUp size={20} />
         </div>
         <div className="space-y-1">
-          <h4 className="font-bold text-amber-900 text-sm">Understanding Daily Averages</h4>
+          <h4 className="font-bold text-amber-900 text-sm">Habit Monitoring</h4>
           <p className="text-xs text-amber-800/80 leading-relaxed">
-            The stats shown above represent the <strong>average daily intake and sleep</strong> calculated over a 7-day period. 
-            This "Typical Day" metric makes it easy to spot if today was a growth spurt or if the child is beginning to need shorter naps.
+            Consistent bars indicate healthy routines. Sudden drops or spikes might signify growth spurts, teething, or changes in home schedule.
           </p>
         </div>
       </div>

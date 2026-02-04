@@ -14,6 +14,9 @@ const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    
+    window.addEventListener('hb_data_updated', loadData);
+    return () => window.removeEventListener('hb_data_updated', loadData);
   }, []);
 
   const loadData = async () => {
@@ -36,11 +39,11 @@ const HistoryPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-brand font-extrabold text-amber-900">Report History</h1>
-          <p className="text-slate-500 font-medium">Record of completed daily logs for children who were present.</p>
+          <p className="text-slate-500 font-medium">Record of completed daily logs for children.</p>
         </div>
         <div className="flex gap-2">
           <button className="p-2 bg-white rounded-xl border border-amber-100 text-slate-400 hover:text-amber-600 shadow-sm">
@@ -63,7 +66,7 @@ const HistoryPage: React.FC = () => {
                   <th className="px-6 py-4">Date</th>
                   <th className="px-6 py-4">Child</th>
                   <th className="px-6 py-4">Mood</th>
-                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-center">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -71,7 +74,7 @@ const HistoryPage: React.FC = () => {
                 {logs.map(log => {
                   const child = children.find(c => c.id === log.childId);
                   const sendRecord = sendLogs.find(sl => sl.dailyLogId === log.id);
-                  const isSent = !!sendRecord || log.status === 'Sent';
+                  const isSent = log.status === 'Sent' || !!sendRecord;
 
                   return (
                     <tr key={log.id} className="hover:bg-amber-50/30 transition-colors">
@@ -89,13 +92,13 @@ const HistoryPage: React.FC = () => {
                         {log.overallMood}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-center gap-1.5">
                           {isSent ? (
-                            <span className="flex items-center gap-1 text-[10px] font-extrabold text-green-600 bg-green-50 px-2 py-1 rounded-full uppercase">
+                            <span className="flex items-center gap-1 text-[10px] font-extrabold text-green-600 bg-green-50 px-2.5 py-1 rounded-full uppercase border border-green-100">
                               <CheckCircle size={10} /> Sent
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-[10px] font-extrabold text-amber-600 bg-amber-50 px-2 py-1 rounded-full uppercase">
+                            <span className="flex items-center gap-1 text-[10px] font-extrabold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full uppercase border border-amber-100">
                                Draft
                             </span>
                           )}
