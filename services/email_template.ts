@@ -1,5 +1,5 @@
 
-import { DailyLog, Child, Parent, Settings, Holiday } from "../types";
+import { DailyLog, Child, Parent, Settings, Holiday, Invoice } from "../types";
 import { format12h } from "../utils/dates";
 
 const getUpcomingHolidays = (logs: Holiday[], reportDate: string): Holiday[] => {
@@ -13,6 +13,65 @@ const getUpcomingHolidays = (logs: Holiday[], reportDate: string): Holiday[] => 
   return logs.filter(h => {
     return h.date >= rDate && h.date <= limitDate;
   }).sort((a, b) => a.date.localeCompare(b.date));
+};
+
+export const generateHtmlInvoiceEmailBody = (invoice: Invoice, child: Child, settings: Settings): string => {
+  const amber400 = '#FBBF24';
+  const amber900 = '#78350F';
+  const slate500 = '#64748b';
+  const slate800 = '#1e293b';
+
+  const freqMultiplier = invoice.frequency === 'Bi-weekly' ? 2 : invoice.frequency === 'Monthly' ? 4 : 1;
+  const rateDisplay = invoice.weeklyRate && invoice.weeklyRate > 0 
+    ? `<p style="margin: 5px 0 0; font-size: 11px; color: ${slate500};">Rate: $${invoice.weeklyRate.toFixed(2)}/wk x ${freqMultiplier} ${freqMultiplier > 1 ? 'weeks' : 'week'}</p>`
+    : '';
+
+  return `
+    <html>
+    <body style="margin: 0; padding: 20px; font-family: sans-serif; background-color: #fffbeb;">
+      <div style="max-width: 480px; margin: 0 auto; background-color: #ffffff; border-radius: 28px; overflow: hidden; border: 1px solid #fde68a; box-shadow: 0 10px 15px rgba(0,0,0,0.05);">
+        <div style="background-color: ${amber400}; padding: 30px 20px; text-align: center;">
+          <h1 style="margin: 0; color: ${amber900}; font-size: 20px; font-weight: 900;">TUITION INVOICE</h1>
+          <p style="margin: 5px 0 0; color: ${amber900}; font-size: 12px; font-weight: bold; opacity: 0.7;">${settings.daycareName}</p>
+        </div>
+        <div style="padding: 30px;">
+          <div style="margin-bottom: 25px;">
+            <p style="margin: 0; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Child Name</p>
+            <p style="margin: 0; font-size: 18px; font-weight: 900; color: ${slate800};">${child.firstName} ${child.lastName}</p>
+          </div>
+          
+          <div style="background-color: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #f1f5f9;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+              <div>
+                <p style="margin: 0; font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Description</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: ${slate800};">${invoice.description}</p>
+                ${rateDisplay}
+              </div>
+              <div style="text-align: right;">
+                <p style="margin: 0; font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Due Date</p>
+                <p style="margin: 0; font-size: 14px; font-weight: bold; color: #e11d48;">${invoice.dueDate}</p>
+              </div>
+            </div>
+            <div style="border-top: 1px dashed #e2e8f0; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+              <p style="margin: 0; font-size: 12px; font-weight: 800; color: ${slate800};">Total Balance</p>
+              <p style="margin: 0; font-size: 24px; font-weight: 900; color: #059669;">$${invoice.amount.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 30px;">
+             <p style="margin: 0; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">Payment Instructions</p>
+             <p style="margin: 0; font-size: 12px; color: ${slate500}; line-height: 1.5;">Please make payments via your preferred method by the due date mentioned above. Thank you for choosing ${settings.daycareName}!</p>
+          </div>
+
+          <div style="text-align: center; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+            <p style="margin: 0; font-size: 12px; font-weight: 900; color: ${amber900};">${settings.daycareName}</p>
+            <p style="margin: 5px 0 0; font-size: 11px; color: ${slate500}; line-height: 1.4;">${settings.emailSignature}</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 };
 
 export const generateEmailBody = (log: DailyLog, child: Child, settings: Settings, aiSummary?: string, holidays: Holiday[] = []): string => {

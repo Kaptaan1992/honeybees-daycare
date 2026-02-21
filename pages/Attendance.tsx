@@ -136,8 +136,8 @@ const AttendancePage: React.FC = () => {
 
         <div className="p-6">
           <div className="grid grid-cols-7 gap-2 text-center mb-4">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-              <span key={day} className="text-[10px] font-black text-slate-300 uppercase">{day}</span>
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+              <span key={`${day}-${index}`} className="text-[10px] font-black text-slate-300 uppercase">{day}</span>
             ))}
             
             {/* Calendar Padding */}

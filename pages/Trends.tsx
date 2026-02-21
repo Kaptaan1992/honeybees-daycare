@@ -75,7 +75,7 @@ const TrendsPage: React.FC = () => {
     });
 
     const logsWithData = data.filter(d => d.hasData);
-    const count = logsWithData.length || 1;
+    const count = Math.max(logsWithData.length, 1);
     const avgMilk = logsWithData.reduce((a, b) => a + b.milk, 0) / count;
     const avgNap = logsWithData.reduce((a, b) => a + b.nap, 0) / count;
 
@@ -134,7 +134,8 @@ const TrendsPage: React.FC = () => {
           <div className="p-6">
             <div className="flex items-end justify-between h-48 gap-2 mb-4 px-2">
               {childTrends?.data.map((d, i) => {
-                const maxVal = Math.max(...childTrends.data.map(x => x.milk), 40);
+                const maxVal = Math.max(...(childTrends.data.map(x => x.milk)), 40);
+                // Ensure height is a valid number and at least 4% if data exists
                 const heightPercent = d.hasData ? Math.max((d.milk / maxVal) * 100, 4) : 0;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full">
@@ -145,13 +146,13 @@ const TrendsPage: React.FC = () => {
                         </div>
                       )}
                       <div 
-                        className={`w-6 sm:w-8 rounded-t-lg transition-all duration-500 ${
-                          d.hasData ? (d.milk > 0 ? 'bg-blue-400 group-hover:bg-blue-500' : 'bg-blue-100') : 'bg-slate-50'
+                        className={`w-full max-w-[32px] rounded-t-lg transition-all duration-500 ${
+                          d.hasData ? (d.milk > 0 ? 'bg-blue-400 group-hover:bg-blue-500 shadow-sm' : 'bg-blue-100') : 'bg-slate-50'
                         }`}
-                        style={{ height: `${heightPercent}%` }}
+                        style={{ height: `${heightPercent}%`, minWidth: '8px' }}
                       ></div>
                     </div>
-                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase">{d.shortDate}</span>
+                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase tracking-tighter">{d.shortDate}</span>
                   </div>
                 );
               })}
@@ -177,7 +178,7 @@ const TrendsPage: React.FC = () => {
           <div className="p-6">
             <div className="flex items-end justify-between h-48 gap-2 mb-4 px-2">
               {childTrends?.data.map((d, i) => {
-                const maxVal = Math.max(...childTrends.data.map(x => x.nap), 240);
+                const maxVal = Math.max(...(childTrends.data.map(x => x.nap)), 240);
                 const heightPercent = d.hasData ? Math.max((d.nap / maxVal) * 100, 4) : 0;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full">
@@ -188,13 +189,13 @@ const TrendsPage: React.FC = () => {
                         </div>
                       )}
                       <div 
-                        className={`w-6 sm:w-8 rounded-t-lg transition-all duration-500 ${
-                          d.hasData ? (d.nap > 0 ? 'bg-purple-400 group-hover:bg-purple-500' : 'bg-purple-100') : 'bg-slate-50'
+                        className={`w-full max-w-[32px] rounded-t-lg transition-all duration-500 ${
+                          d.hasData ? (d.nap > 0 ? 'bg-purple-400 group-hover:bg-purple-500 shadow-sm' : 'bg-purple-100') : 'bg-slate-50'
                         }`}
-                        style={{ height: `${heightPercent}%` }}
+                        style={{ height: `${heightPercent}%`, minWidth: '8px' }}
                       ></div>
                     </div>
-                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase">{d.shortDate}</span>
+                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase tracking-tighter">{d.shortDate}</span>
                   </div>
                 );
               })}

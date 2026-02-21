@@ -175,18 +175,20 @@ const ReportPreview: React.FC = () => {
   if (error) return <div className="p-20 text-center">{error}</div>;
 
   return (
-    <div className="space-y-6 pb-60">
+    <div className="space-y-6 pb-20 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
-        <button onClick={() => navigate(`/log/${childId}`)} className="p-2 text-slate-400 hover:text-amber-600"><ArrowLeft /></button>
+        <button onClick={() => navigate(`/log/${childId}`)} className="p-3 -ml-2 text-slate-400 hover:text-amber-600 transition-colors">
+          <ArrowLeft size={24} />
+        </button>
         <h1 className="text-2xl font-brand font-extrabold text-amber-900">Review Report</h1>
         <div className="w-10" />
       </div>
 
       {isSentSuccessfully ? (
-        <div className="bg-white rounded-3xl p-10 text-center shadow-xl border border-amber-100 space-y-4">
+        <div className="bg-white rounded-[2.5rem] p-10 text-center shadow-xl border border-amber-100 space-y-4">
           <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle2 size={40} /></div>
           <h2 className="text-2xl font-brand font-extrabold text-slate-800">Report Sent!</h2>
-          <button onClick={() => navigate('/')} className="mt-6 bg-amber-600 text-white font-bold px-8 py-3 rounded-2xl">Back to Dashboard</button>
+          <button onClick={() => navigate('/')} className="mt-6 bg-amber-600 text-white font-extrabold px-8 py-4 rounded-2xl shadow-lg shadow-amber-200">Back to Dashboard</button>
         </div>
       ) : (
         <>
@@ -200,7 +202,7 @@ const ReportPreview: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-700">Include Weekly Trends</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">7-day milk & nap averages</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">7-day milk & nap averages</p>
                   </div>
                 </div>
                 <input 
@@ -216,7 +218,7 @@ const ReportPreview: React.FC = () => {
                    <p className="text-xs font-bold text-slate-400 uppercase">Recipients</p>
                    {activeRecipients.length === 0 && (
                      <div className="flex items-center gap-1 text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full uppercase">
-                       <AlertCircle size={10}/> No Recipients Active
+                       <AlertCircle size={10}/> No Active Recipients
                      </div>
                    )}
                 </div>
@@ -231,37 +233,43 @@ const ReportPreview: React.FC = () => {
                     </div>
                   </div>
                 ))}
-                {parents.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">No parents linked to this child profile.</p>}
+                {parents.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">No parents linked yet.</p>}
               </div>
             </div>
           </section>
 
           <section className="space-y-4">
-            <div className="bg-white rounded-3xl border border-amber-100 shadow-sm overflow-hidden min-h-[400px] p-4 bg-slate-50">
-               <div className="max-w-[400px] mx-auto bg-white shadow-lg" dangerouslySetInnerHTML={{ __html: emailContentHtml }} />
+            <div className="bg-white rounded-[2.5rem] border border-amber-100 shadow-sm overflow-hidden p-6 bg-slate-50">
+               <div className="max-w-[420px] mx-auto bg-white shadow-xl rounded-2xl overflow-hidden border border-slate-200" dangerouslySetInnerHTML={{ __html: emailContentHtml }} />
             </div>
+            
             <div className="flex gap-3">
-              <button onClick={handleGenerateAISummary} disabled={isGenerating} className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 font-bold py-4 rounded-2xl border border-indigo-100 disabled:opacity-50">
-                {isGenerating ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />} AI Refine Summary
+              <button onClick={handleGenerateAISummary} disabled={isGenerating} className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 font-black py-5 rounded-2xl border border-indigo-100 disabled:opacity-50 shadow-sm active:scale-95 transition-all">
+                {isGenerating ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />} AI Refine Summary
               </button>
-              <button onClick={() => window.print()} className="bg-slate-50 text-slate-600 font-bold py-4 px-6 rounded-2xl border border-slate-100"><Printer size={18} /></button>
+              <button onClick={() => window.print()} className="bg-slate-50 text-slate-600 font-bold py-5 px-8 rounded-2xl border border-slate-100 shadow-sm active:scale-95 transition-all"><Printer size={22} /></button>
             </div>
           </section>
 
-          <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 pb-10 bg-white/90 backdrop-blur-md border-t border-amber-100 flex flex-col items-center gap-4 z-[70] shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
-            <label className="w-full max-w-2xl flex items-center justify-between p-3 bg-amber-50 rounded-2xl border border-amber-100 cursor-pointer">
+          <div className="bg-white rounded-[2.5rem] border border-amber-100 p-8 shadow-sm space-y-6">
+            <label className="w-full flex items-center justify-between p-4 bg-amber-50 rounded-2xl border border-amber-100 cursor-pointer">
               <div className="flex items-center gap-3">
-                <Copy size={16} className="text-amber-600" />
-                <span className="text-xs font-bold text-amber-900">BCC Staff Record ({settings.fromEmail})</span>
+                <div className="bg-white p-2 rounded-xl text-amber-600 shadow-sm"><Copy size={16} /></div>
+                <div>
+                   <span className="text-sm font-bold text-amber-900 block leading-tight">Staff Records Copy</span>
+                   <span className="text-[10px] text-amber-700/60 font-medium">BCC: {settings.fromEmail}</span>
+                </div>
               </div>
-              <input type="checkbox" checked={sendCopyToSelf} onChange={e => setSendCopyToSelf(e.target.checked)} />
+              <input type="checkbox" className="w-6 h-6 accent-amber-600" checked={sendCopyToSelf} onChange={e => setSendCopyToSelf(e.target.checked)} />
             </label>
+
             <button 
               onClick={() => handleSendEmail(false)} 
               disabled={isSending || (activeRecipients.length === 0 && !sendCopyToSelf)} 
-              className="w-full max-w-2xl flex items-center justify-center gap-3 bg-amber-600 text-white font-extrabold py-5 rounded-3xl shadow-xl shadow-amber-200 disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none transition-all transform active:scale-95"
+              className="w-full flex items-center justify-center gap-4 bg-amber-600 text-white font-black py-6 rounded-[2rem] shadow-2xl shadow-amber-200 disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none transition-all transform active:scale-95 text-lg"
             >
-              {isSending ? <Loader2 className="animate-spin" /> : <Send size={20} />} Confirm & Send Report Now
+              {isSending ? <Loader2 className="animate-spin" /> : <Send size={24} />} 
+              <span>{activeRecipients.length === 0 && !sendCopyToSelf ? 'No Active Recipients' : 'Confirm & Send Report'}</span>
             </button>
           </div>
         </>

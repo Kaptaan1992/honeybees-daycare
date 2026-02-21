@@ -4,6 +4,7 @@ export type MealAmount = 'All' | 'Most' | 'Some' | 'Little';
 export type NapQuality = 'Great' | 'Okay' | 'Restless';
 export type DiaperType = 'Wet' | 'BM' | 'Both' | 'Potty';
 export type Language = 'English' | 'Urdu' | 'Punjabi';
+export type BillingFrequency = 'Weekly' | 'Bi-weekly' | 'Monthly';
 
 export interface Child {
   id: string;
@@ -37,6 +38,19 @@ export interface Holiday {
   date: string; // YYYY-MM-DD
   type: 'Closed' | 'Half Day' | 'Break';
   notes?: string;
+}
+
+export interface Invoice {
+  id: string;
+  childId: string;
+  amount: number;
+  weeklyRate?: number;
+  frequency?: BillingFrequency;
+  dueDate: string;
+  description: string;
+  status: 'Pending' | 'Paid' | 'Overdue' | 'Cancelled';
+  createdAt: string;
+  sentAt?: string;
 }
 
 export interface MealEntry {

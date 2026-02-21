@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Child, Parent, DailyLog, Settings, EmailSendLog, Holiday } from './types';
+import { Child, Parent, DailyLog, Settings, EmailSendLog, Holiday, Invoice } from './types';
 
 const STORAGE_KEYS = {
   CHILDREN: 'hb_children',
@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'hb_settings',
   SEND_LOGS: 'hb_send_logs',
   AUTH_TOKEN: 'hb_auth_token',
-  HOLIDAYS: 'hb_holidays'
+  HOLIDAYS: 'hb_holidays',
+  INVOICES: 'hb_invoices'
 };
 
 const INITIAL_SETTINGS: Settings = {
@@ -124,6 +125,8 @@ export class Store {
       if (holidays.length > 0) await client.from('holidays').upsert(holidays);
       const sendLogs = await this.getSendLogs();
       if (sendLogs.length > 0) await client.from('send_logs').upsert(sendLogs);
+      const invoices = await this.getInvoices();
+      if (invoices.length > 0) await client.from('invoices').upsert(invoices);
       await this.syncSettingsToCloud();
     } catch (e) { console.error("Full Sync Error:", e); }
   }
@@ -191,6 +194,14 @@ export class Store {
     if (client) await client.from('daily_logs').upsert(newLog);
     
     return newLog;
+  }
+
+  static async getPreviousDailyLog(childId: string, currentDate: string): Promise<DailyLog | null> {
+    const logs = await this.getDailyLogs();
+    const childLogs = logs
+      .filter(l => l.childId === childId && l.date < currentDate)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    return childLogs.length > 0 ? childLogs[0] : null;
   }
 
   static handleRealtimeLogUpdate(remoteLog: DailyLog) {
@@ -288,6 +299,41 @@ export class Store {
     await this.saveHolidays(holidays);
     const client = this.getClient();
     if (client) await client.from('holidays').delete().eq('id', id);
+  }
+
+  private static getInvoicesLocal(): Invoice[] {
+    const data = localStorage.getItem(STORAGE_KEYS.INVOICES);
+    return data ? JSON.parse(data) : [];
+  }
+
+  static async getInvoices(): Promise<Invoice[]> {
+    const client = this.getClient();
+    if (client) {
+      const { data, error } = await client.from('invoices').select('*');
+      if (!error && data) {
+        localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(data));
+        return data as Invoice[];
+      }
+    }
+    return this.getInvoicesLocal();
+  }
+
+  static async saveInvoice(invoice: Invoice) {
+    const invoices = this.getInvoicesLocal();
+    const index = invoices.findIndex(i => i.id === invoice.id);
+    if (index !== -1) invoices[index] = invoice;
+    else invoices.push(invoice);
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    
+    const client = this.getClient();
+    if (client) await client.from('invoices').upsert(invoice);
+  }
+
+  static async deleteInvoice(id: string) {
+    const invoices = this.getInvoicesLocal().filter(i => i.id !== id);
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    const client = this.getClient();
+    if (client) await client.from('invoices').delete().eq('id', id);
   }
 
   static async deleteDailyLog(id: string) {

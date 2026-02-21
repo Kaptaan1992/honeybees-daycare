@@ -28,6 +28,13 @@
     .font-brand {
       font-family: 'Quicksand', sans-serif;
     }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
     #root:empty::before {
       content: 'Loading Honeybees...';
       display: flex;
@@ -55,7 +62,6 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-amber-50 text-slate-900 min-h-screen">
   <div id="root"></div>

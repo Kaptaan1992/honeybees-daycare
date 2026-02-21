@@ -216,7 +216,6 @@ const AppContent: React.FC = () => {
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-xl border-t border-amber-100 flex items-center justify-around px-1 z-[60] shadow-[0_-4px_10px_rgba(0,0,0,0.02)] print:hidden">
           <MobileTab to="/" icon={LayoutDashboard} label="Buzz" />
           <MobileTab to="/children" icon={Baby} label="Kids" />
-          <MobileTab to="/history" icon={History} label="History" />
           <MobileTab to="/attendance" icon={CalendarCheck} label="Attendance" />
           <MobileTab to="/trends" icon={LineChart} label="Trends" />
           <MobileTab to="/emergency" icon={ShieldAlert} label="SOS" />

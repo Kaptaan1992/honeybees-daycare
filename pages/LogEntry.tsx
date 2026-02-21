@@ -37,7 +37,8 @@ import {
   Users,
   Smile,
   Zap,
-  Star
+  Star,
+  Copy
 } from 'lucide-react';
 
 const LogEntry: React.FC = () => {
@@ -83,6 +84,40 @@ const LogEntry: React.FC = () => {
     const newLog = { ...log, ...updates };
     setLog(newLog);
     await Store.saveDailyLog(newLog);
+  };
+
+  const copyPreviousReport = async () => {
+    if (!childId || !log) return;
+    setIsLoading(true);
+    try {
+      const prevLog = await Store.getPreviousDailyLog(childId, currentDate);
+      if (prevLog) {
+        // Copy relevant fields but keep current log's ID and date
+        const copiedLog: Partial<DailyLog> = {
+          arrivalTime: prevLog.arrivalTime,
+          departureTime: prevLog.departureTime,
+          overallMood: prevLog.overallMood,
+          teacherNotes: prevLog.teacherNotes,
+          activityNotes: prevLog.activityNotes,
+          suppliesNeeded: prevLog.suppliesNeeded,
+          // Map sub-items to new IDs to ensure they are fresh entries
+          meals: prevLog.meals.map(m => ({ ...m, id: Math.random().toString(36).substr(2, 9) })),
+          bottles: prevLog.bottles.map(b => ({ ...b, id: Math.random().toString(36).substr(2, 9) })),
+          naps: prevLog.naps.map(n => ({ ...n, id: Math.random().toString(36).substr(2, 9) })),
+          diapers: prevLog.diapers.map(d => ({ ...d, id: Math.random().toString(36).substr(2, 9) })),
+          activities: prevLog.activities.map(a => ({ ...a, id: Math.random().toString(36).substr(2, 9) })),
+          medications: (prevLog.medications || []).map(m => ({ ...m, id: Math.random().toString(36).substr(2, 9) })),
+        };
+        await updateLog(copiedLog);
+      } else {
+        alert("No previous report found for this child.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to copy previous report.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const addMeal = () => {
@@ -144,9 +179,18 @@ const LogEntry: React.FC = () => {
         </button>
         <div className="text-right">
           <h1 className="text-2xl font-brand font-extrabold text-amber-900">{child.firstName}'s Day</h1>
-          <p className="text-sm text-slate-500 font-medium">
-            {new Date(currentDate.replace(/-/g, '/')).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-          </p>
+          <div className="flex items-center justify-end gap-3 mt-1">
+            <button 
+              onClick={copyPreviousReport}
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-600 hover:text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100 transition-colors"
+            >
+              <Copy size={12} />
+              Copy Previous
+            </button>
+            <p className="text-sm text-slate-500 font-medium">
+              {new Date(currentDate.replace(/-/g, '/')).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+            </p>
+          </div>
         </div>
       </div>
 
